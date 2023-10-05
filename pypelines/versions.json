@@ -1,0 +1,40 @@
+{
+    "other_steps": {
+        "versions": {
+            "azdaz1161": {
+                "deprecated": false,
+                "step_name": "step2",
+                "function_hash": "azdaz",
+                "creation_date": "2023-15-48 T 01:15:02.0515"
+            },
+            "second_version_string": {
+                "deprecated": false,
+                "step_name": "step1",
+                "function_hash": "step1",
+                "creation_date": "2023-15-48 T 01:15:02.0515"
+            }
+        },
+        "step_renamings": {
+            "old_step_name": "my_step_name"
+        }
+    },
+    "demoPipeClass": {
+        "versions": {
+            "azbdauzbm1811": {
+                "deprecated": false,
+                "step_name": "initial",
+                "function_hash": "my_function_hash",
+                "creation_date": "2023-15-48 T 01:15:02.0515"
+            },
+            "another_version_string": {
+                "deprecated": false,
+                "step_name": "step_name3",
+                "function_hash": "my_function_hash",
+                "creation_date": "2023-15-48 T 01:15:02.0515"
+            }
+        },
+        "step_renamings": {
+            "old_step_name": "my_step_name"
+        }
+    }
+}
