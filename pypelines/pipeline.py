@@ -1,13 +1,17 @@
 
 
+from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 
-
+if TYPE_CHECKING:
+    from .pipe import BasePipe
 
 class BasePipeline:
 
     pipes = {}
     
-    def register_pipe(self,pipe_class):
+    def register_pipe(self, pipe_class : type) -> type:
+        """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
+        The Wraper returns the class without changing it."""
         pipe_class(self)
 
         return pipe_class

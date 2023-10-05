@@ -1,11 +1,22 @@
-from . step import BaseStep, step
+from . step import BaseStep
 from . multisession import BaseMultisessionAccessor
 
-from typing import Callable, Type, Iterable
+from functools import wraps
+
+from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .pipeline import BasePipeline
+
+class OutputData(Protocol):
+    """Can be a mapping, iterable, single element, or None.
+
+    This class is defined for typehints, and is not a real class useable at runtime"""
 
 class PipeMetaclass(type):
     
     def __new__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> Type:
+        print(pipe_name, attributes)
         attributes["pipe_name"] = pipe_name
         
         steps = {}
@@ -14,16 +25,16 @@ class PipeMetaclass(type):
             if getattr(attribute, "is_step", False):
                 steps[name] = PipeMetaclass.make_step_attributes(attribute , pipe_name , name)
         
+        attributes["steps"] = steps
+
         if len(attributes["steps"]) > 1 and attributes["single_step"]:
             raise ValueError(f"Cannot set single_step to True if you registered more than one step inside {pipe_name} class")
         
-        attributes["steps"] = steps
-
         return super().__new__(cls, pipe_name, bases, attributes)
 
     @staticmethod
     def make_step_attributes(step : Callable, pipe_name : str, step_name : str) -> Callable:
-
+        print(f"init of {pipe_name}")
         setattr(step, "pipe_name", pipe_name) 
         setattr(step, "step_name", step_name) 
 
@@ -39,7 +50,7 @@ class BasePipe(metaclass = PipeMetaclass):
     step_class = BaseStep
     multisession_class = BaseMultisessionAccessor
 
-    def __init__(self, parent_pipeline : BasePipeline) -> None :
+    def __init__(self, parent_pipeline : "BasePipeline") -> None :
 
         self.multisession = self.multisession_class(self)
         self.pipeline = parent_pipeline
@@ -62,10 +73,22 @@ class BasePipe(metaclass = PipeMetaclass):
             self.pipeline.pipes[self.pipe_name] = self
             setattr(self.pipeline, self.pipe_name, self)
 
+        self._make_wrapped_functions()
+
+    def _make_wrapped_functions(self):
+        self.make_wrapped_save()
+        self.make_wrapped_load()
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__bases__[0].__name__}.{self.pipe_name} PipeObject>"
 
-    def file_getter(self, session, extra, version) ->  |  :
+    def make_wrapped_save(self):
+        self.save = self.dispatcher(self.file_saver)
+
+    def make_wrapped_load(self):
+        self.load = self.dispatcher(self.file_loader)
+
+    def file_getter(self, session, extra, version) -> OutputData :
         #finds file, opens it, and return data.
         #if it cannot find the file, it returns a IOError
         ...
@@ -73,7 +96,8 @@ class BasePipe(metaclass = PipeMetaclass):
 
     def _check_version(self, step_name , found_version):
         #checks the found_version of the file is above or equal in the requirement order, to the step we are looking for
-        ...
+        #TODO
+        self.pipeline.get_requirement_stack(step_name)
 
     def step_version(self, step):
         #simply returns the current string of the version that is in .
@@ -83,10 +107,10 @@ class BasePipe(metaclass = PipeMetaclass):
         #simply returns the version string of the file(s) that it found.
         ...
         
-    def file_saver(self, session, dumped_object, version ):
+    def file_saver(self, session, dumped_object, extra, version ):
         ...
 
-    def file_loader(self, session, dumped_object, version ):
+    def file_loader(self, session, extra, version ):
         ...
         
     def file_checker(self, session):
@@ -96,7 +120,3 @@ class BasePipe(metaclass = PipeMetaclass):
         # the dispatcher must be return a wrapped function
         ...
 
-class ExamplePipe(BasePipe):
-
-    @step(requires = [])
-    def 
