@@ -2,6 +2,7 @@ from . step import BaseStep
 from . multisession import BaseMultisessionAccessor
 
 from functools import wraps
+import inspect
 
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 
@@ -31,10 +32,17 @@ class PipeMetaclass(type):
             raise ValueError(f"Cannot set single_step to True if you registered more than one step inside {pipe_name} class")
         
         return super().__new__(cls, pipe_name, bases, attributes)
+    
+    def __init__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> None:
+        
+        print(f"init of {pipe_name}")
+        print(cls.__dict__)
+
+
 
     @staticmethod
     def make_step_attributes(step : Callable, pipe_name : str, step_name : str) -> Callable:
-        print(f"init of {pipe_name}")
+        
         setattr(step, "pipe_name", pipe_name) 
         setattr(step, "step_name", step_name) 
 
@@ -58,6 +66,10 @@ class BasePipe(metaclass = PipeMetaclass):
         # this loop allows to populate self.steps from the now instanciated version of the step method.
         # Using only instanciated version is important to be able to use self into it later, 
         # without confusing ourselved with uninstanciated versions in the steps dict
+
+        methods = inspect.getmembers(self, predicate= inspect.ismethod)
+        print(methods)
+
         for step_name, _ in self.steps.items():
             step = getattr(self , step_name) # get the instanciated step method from name. 
             step = self.step_class(self.pipeline, self, step, step_name)

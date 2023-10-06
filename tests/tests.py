@@ -4,16 +4,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 import pypelines
 
-from . instances import pipeline_test_instance
+from pypelines import examples
 
 class TestVersions(unittest.TestCase):
 
     def setUp(self):
-        self.version_handler = pypelines.HashVersionHandler('version_example.py')
-        self.pipeline = pipeline_test_instance
+        self.pipeline = examples.example_pipeline
 
-    def test_function_hash(self):
-        self.assertEqual(self.version_handler.get_function_hash(), "ad2d1f4")
+    def test_pipeline_generate(self):
+        self.assertEqual(self.pipeline.ExamplePipe.example_step1.generate("bonjour"), {"argument1" : "bonjour", "optionnal_argument2" : 23})
 
 if __name__ == '__main__':
     unittest.main()
