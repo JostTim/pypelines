@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 import hashlib, random, json, inspect, re
 
+from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . step import BaseStep
+
 @dataclass
 class Version:
     pipe_name : str
@@ -72,7 +77,7 @@ class BaseVersionHandler:
     def get_new_version_string(self) -> str :
         ...
 
-    def get_active_version(self, step) -> Version :
+    def get_active_version(self, step : "BaseStep") -> Version :
         ...
 
     def apply_changes(self, versions) -> None :

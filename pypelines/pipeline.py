@@ -15,9 +15,6 @@ class BasePipeline:
         pipe_class(self)
 
         return pipe_class
-    
-    def __init__(self, versions = None):
-        self.versions = versions
         
     def resolve(self, instance_name : str) :
         pipe_name , step_name = instance_name.split(".")

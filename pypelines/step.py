@@ -3,27 +3,35 @@ from .loggs import loggedmethod
 import logging
 from typing import Callable
 
-def stepmethod(requires = []):
+from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .pipeline import BasePipeline
+    from .pipe import BasePipe
+
+def stepmethod(requires = [], version = None):
     # This method allows to register class methods inheriting of BasePipe as steps.
     # It basically just step an "is_step" stamp on the method that are defined as steps.
     # This stamp will later be used in the metaclass __new__ to set additionnal usefull attributes to those methods
-    if not isinstance(requires, list):
-        requires = [requires]
-        
     def registrate(function):
-        function.requires = requires
+
+        function.requires = [requires] if not isinstance(requires, list) else requires
         function.is_step = True
+        function.use_version = False if version is None else True
+        function.version = version
         return function
     return registrate
 
 class BaseStep:
-    
-    def __init__(self, pipeline, pipe, step, step_name):
+
+    def __init__(self, pipeline : "BasePipeline", pipe : "BasePipe", step : "BaseStep", step_name : str):
         self.pipeline = pipeline # save an instanciated access to the pipeline parent
         self.pipe = pipe # save an instanciated access to the pipe parent
         self.step = step # save an instanciated access to the step function (undecorated)
         self.pipe_name = pipe.pipe_name
         self.step_name = step_name
+        self.use_version = self.step.use_version
+        self.version = self.step.version
 
         self.single_step = self.pipe.single_step
         self.requires = self.step.requires
@@ -41,32 +49,23 @@ class BaseStep:
     def __repr__(self):
         return f"<{self.pipe_name}.{self.step_name} StepObject>"
 
-    def _saving_wrapper(self, function):
-        return self.pipe.dispatcher(self._version_wrapper(function, self.pipe.step_version))
-
-    def _loading_wrapper(self, function):
-        return self.pipe.dispatcher(self._version_wrapper(function, self.pipe.step_version))
-
-    def _generating_wrapper(self, function):
-        return 
-
     def _make_wrapped_functions(self):
         self.make_wrapped_save()
         self.make_wrapped_load()
         self.make_wrapped_generate()
 
     def make_wrapped_save(self):
-        self.save = self._saving_wrapper(self.pipe.file_saver)
+        self.save = self.pipe.dispatcher(self._version_wrapper(self.pipe.file_saver))
     
     def make_wrapped_load(self):
-        self.load = self._loading_wrapper(self.pipe.file_loader)
+        self.load = self.pipe.dispatcher(self._version_wrapper(self.pipe.file_loader))
     
     def make_wrapped_generate(self):
         self.generate = loggedmethod(
             self._version_wrapper(
                 self.pipe.dispatcher(
-                    self._loading_wrapper(
-                        self._saving_wrapper(
+                    self._load_or_generate_wrapper(
+                        self._save_after_generate_wrapper(
                             self.pipe.pre_run_wrapper(self.step)
                             )
                         )
@@ -74,20 +73,26 @@ class BaseStep:
                 )
             )
 
-            
-    def _version_wrapper(self, function_to_wrap, version_getter):
-        @wraps(function_to_wrap)
+
+
+    def step_current_version(self) -> str:
+        #simply returns the current string of the version that is in the config file.
+        return "version"
+        ...
+
+    def _version_wrapper(self, function):
+        @wraps(function)
         def wrapper(*args,**kwargs):
-            version = version_getter(self)
-            return function_to_wrap(*args, version=version, **kwargs)
+            version = self.step_current_version(self)
+            return function(*args, version=version, **kwargs)
         return wrapper
 
-    def _loading_wrapper(self, func: Callable):  
+    def _load_or_generate_wrapper(self, function: Callable):  
         """
         Decorator to load instead of calculating if not refreshing and saved data exists
         """
 
-        @wraps(func)
+        @wraps(function)
         def wrap(session_details, *args, **kwargs):
             """
             Decorator function
@@ -108,7 +113,8 @@ class BaseStep:
             logger = logging.getLogger("load_pipeline")
 
             kwargs = kwargs.copy()
-            extra = kwargs.get("extra", None)
+            extra = kwargs.get("extra", "")
+            version = kwargs.get("version", "")
             skipping = kwargs.pop("skip", False)
             # we raise if file not found only if skipping is True
             refresh = kwargs.get("refresh", False)
@@ -130,14 +136,14 @@ class BaseStep:
                 )
 
             if not refresh:
-                if skipping and self.pipe.file_checker(session_details, extra):
+                if skipping and self.pipe.file_checker(session_details, extra=extra, version=version):
                     logger.load_info(
                         f"File exists for {self.pipe_name}{'.' + extra if extra else ''}. Loading and processing have been skipped"
                     )
                     return None
                 logger.debug(f"Trying to load saved data")
                 try:
-                    result = self.pipe.file_loader(session_details, extra=extra)
+                    result = self.pipe.file_loader(session_details, extra=extra, version=version)
                     logger.load_info(
                         f"Found and loaded {self.pipe_name}{'.' + extra if extra else ''} file. Processing has been skipped "
                     )
@@ -150,27 +156,27 @@ class BaseStep:
             logger.load_info(
                 f"Performing the computation to generate {self.pipe_name}{'.' + extra if extra else ''}. Hold tight."
             )
-            return func(session_details, *args, **kwargs)
+            return function(session_details, *args, **kwargs)
 
         return wrap
 
-    def _saving_wrapper(self, func: Callable):
+    def _save_after_generate_wrapper(self, function: Callable):
         # decorator to load instead of calculating if not refreshing and saved data exists
-        @wraps(func)
-        def wrap(session_details, *args, **kwargs):
+        @wraps(function)
+        def wrap(session, *args, **kwargs):
 
             logger = logging.getLogger("save_pipeline")
 
             kwargs = kwargs.copy()
             extra = kwargs.get("extra", "")
+            version = kwargs.get("version", "")
             save_pipeline = kwargs.pop("save_pipeline", True)
 
-   
-            result = func(session_details, *args, **kwargs)
-            if session_details is not None:
+            result = function(session, *args, **kwargs)
+            if session is not None:
                 if save_pipeline:
                     # we overwrite inside saver, if file exists and save_pipeline is True
-                    self.pipe.file_checker(result, session_details, extra=extra)
+                    self.pipe.file_saver(session, result, extra=extra, version=version)
             else:
                 logger.warning(
                     f"Cannot guess data saving location for {self.pipe_name}: 'session_details' argument must be supplied."

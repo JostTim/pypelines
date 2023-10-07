@@ -25,7 +25,7 @@ setup(
     license= 'MIT',
     author= 'Timothé Jost-MOUSSEAU',
     author_email= 'timothe.jost-mousseau@pasteur.com',
-    description= 'Image and video management for research use, in an unified easy to use API',
+    description= 'Framework to organize pprocessing files outputs.',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
