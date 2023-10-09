@@ -1,6 +1,7 @@
 from . step import BaseStep
 from . multisession import BaseMultisessionAccessor
 from . sessions import Session
+from . disk import PickleObject
 
 from functools import wraps
 import inspect
@@ -10,37 +11,37 @@ from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 if TYPE_CHECKING:
     from .pipeline import BasePipeline
 
-class PipeMetaclass(type):
+# class PipeMetaclass(type):
     
-    def __new__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> Type:
-        return super().__new__(cls, pipe_name, bases, attributes)
+#     def __new__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> Type:
+#         return super().__new__(cls, pipe_name, bases, attributes)
     
-    def __init__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> None:
+#     def __init__(cls : Type, pipe_name : str, bases : Iterable[Type], attributes : dict) -> None:
         
-        steps = getattr(cls,"steps",{})
+#         steps = getattr(cls,"steps",{})
 
-        for name, attribute in attributes.items():
-            if getattr(attribute, "is_step", False):
-                steps[name] = PipeMetaclass.step_with_attributes(attribute , pipe_name , name)
+#         for name, attribute in attributes.items():
+#             if getattr(attribute, "is_step", False):
+#                 steps[name] = PipeMetaclass.step_with_attributes(attribute , pipe_name , name)
 
-        setattr(cls,"steps",steps)
+#         setattr(cls,"steps",steps)
 
-    @staticmethod
-    def step_with_attributes(step : BaseStep, pipe_name : str, step_name : str) -> BaseStep:
+#     @staticmethod
+#     def step_with_attributes(step : BaseStep, pipe_name : str, step_name : str) -> BaseStep:
         
-        setattr(step, "pipe_name", pipe_name) 
-        setattr(step, "step_name", step_name) 
+#         setattr(step, "pipe_name", pipe_name) 
+#         setattr(step, "step_name", step_name) 
 
-        return step
+#         return step
     
-class BasePipe(metaclass = PipeMetaclass):
+class BasePipe :#(metaclass = PipeMetaclass):
     # this class must implements only the logic to link blocks together.
     # It is agnostic about what way data is stored, and the way the blocks function. 
     # Hence it is designed to be overloaded, and cannot be used as is.
 
-    use_versions = True
     single_step = False
     step_class = BaseStep
+    disk_class = PickleObject
     multisession_class = BaseMultisessionAccessor
 
     def __init__(self, parent_pipeline : "BasePipeline") -> None :
@@ -48,25 +49,36 @@ class BasePipe(metaclass = PipeMetaclass):
         self.multisession = self.multisession_class(self)
         self.pipeline = parent_pipeline
         self.pipe_name = self.__class__.__name__
-        print(self.pipe_name)
+        #print(self.pipe_name)
+
+        self.steps = {}
+        for (step_name, step) in inspect.getmembers( self , predicate = inspect.ismethod ):
+            if getattr(step, "is_step", False): 
+                self.steps[step_name] = step
+
+        if len(self.steps) < 1 :
+            raise ValueError(f"You should register at least one step class with @stepmethod in {self.pipe_name} class. { self.steps = }")
 
         if len(self.steps) > 1 and self.single_step:
-            raise ValueError(f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class")
+            raise ValueError(f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class. { self.steps = }")
         
+        #if self.single_step is None : 
+        #    self.single_step = False if len(self.steps) > 1 else True
+
         # this loop allows to populate self.steps from the now instanciated version of the step method.
         # Using only instanciated version is important to be able to use self into it later, 
         # without confusing ourselved with uninstanciated versions in the steps dict
 
-        for step_name, _ in self.steps.items():
-            step = getattr(self , step_name) # get the instanciated step method from name. 
+        for step_name, step in self.steps.items():
             step = self.step_class(self.pipeline, self, step, step_name)
-            self.steps[step_name] = step
+            self.steps[step_name] = step #replace the bound_method by a step_class using that bound method, so that we attach the necessary components to it.
             setattr(self, step_name, step)
 
         # attaches itself to the parent pipeline
         if self.single_step :
             step = list(self.steps.values())[0]
             self.pipeline.pipes[self.pipe_name] = step
+            step.steps = self.steps #just add steps to this step serving as a pipe, so that it behaves similarly to a pipe for some pipelines function requiring this attribute to exist.
             setattr(self.pipeline, self.pipe_name, step)
         else :
             self.pipeline.pipes[self.pipe_name] = self

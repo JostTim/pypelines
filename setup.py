@@ -18,14 +18,14 @@ def get_version(rel_path):
     raise RuntimeError('Unable to find version string.')
 
 setup(
-    name= 'analines',
+    name= 'pypelines',
     version= get_version(Path('pypelines', '__init__.py')),
     packages=find_packages(),
     url= 'https://gitlab.pasteur.fr/haisslab/data-management/pypelines',
     license= 'MIT',
     author= 'Timothé Jost-MOUSSEAU',
     author_email= 'timothe.jost-mousseau@pasteur.com',
-    description= 'Framework to organize pprocessing files outputs.',
+    description= 'Framework to organize processing code outputs to/from disk, processing chaining and versionning with a common easy to use api',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -39,10 +39,6 @@ setup(
         'Programming Language :: Python :: 3.11',
     ],
     install_requires=[
-        "numpy>=1.23",
-        "opencv-python>=4.6",
-        "ffmpeg>=1.4",
-        "tifffile>=2022.10"
     ],
     entry_points={},
     scripts={},

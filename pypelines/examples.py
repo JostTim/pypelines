@@ -6,7 +6,7 @@ from .step import stepmethod
 class ExamplePipeline(BasePipeline):
     ...
 
-example_pipeline = ExamplePipeline()
+example_pipeline = ExamplePipeline("example")
 
 @example_pipeline.register_pipe
 class ExamplePipe(PicklePipe):
