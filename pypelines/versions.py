@@ -4,7 +4,7 @@ import hashlib, random, json, inspect, re
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from . step import BaseStep
+    from .steps import BaseStep
 
 @dataclass
 class Version:
