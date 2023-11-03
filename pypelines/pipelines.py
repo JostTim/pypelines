@@ -129,6 +129,8 @@ class Pipeline:
             pos = self.get_aligned_layout(Gfunc, x_spacing = x_spacing)
         elif layout == "tree" :
             pos = self.get_tree_layout(Gname, x_spacing = x_spacing)
+        elif layout == "spring":
+            pos = nx.spring_layout(Gname)
         else :
             raise ValueError("layout must be : aligned or tree")
         

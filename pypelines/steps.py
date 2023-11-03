@@ -1,6 +1,7 @@
 from functools import wraps, partial, update_wrapper
 from .loggs import loggedmethod
-import logging
+from .arguments import autoload_arguments
+import logging, inspect
 
 from dataclasses import dataclass
 
@@ -12,21 +13,23 @@ if TYPE_CHECKING:
     from .pipes import BasePipe
     from .disk import BaseDiskObject
 
-def stepmethod(requires=[], version=None):
+
+def stepmethod(requires=[], version=None, do_dispatch=True):
     # This  allows method  to register class methods inheriting of BasePipe as steps.
     # It basically just step an "is_step" stamp on the method that are defined as steps.
     # This stamp will later be used in the metaclass __new__ to set additionnal usefull attributes to those methods
-    def registrate(function : Callable):
+    def registrate(function: Callable):
         function.requires = [requires] if not isinstance(requires, list) else requires
         function.is_step = True
         function.version = version
+        function.do_dispatch = do_dispatch
         function.step_name = function.__name__
         return function
 
     return registrate
 
-class BaseStep:
 
+class BaseStep:
     def __init__(
         self,
         pipeline: "BasePipeline",
@@ -40,16 +43,18 @@ class BaseStep:
         # save an instanciated access to the step function (undecorated)
         self.worker = worker
 
-        # we attach the values of the worker elements to BaseStep as they are get only (no setter) on worker (bound method) 
-        self.version = self.worker.version 
+        # we attach the values of the worker elements to BaseStep as they are get only (no setter) on worker (bound method)
+        self.do_dispatch = self.worker.do_dispatch
+        self.version = self.worker.version
         self.requires = self.worker.requires
         self.step_name = self.worker.step_name
 
         self.worker = MethodType(worker.__func__, self)
 
-        self.make_wrapped_functions()
-        
+        # self.make_wrapped_functions()
+
         update_wrapper(self, self.worker)
+        # update_wrapper(self.generate, self.worker)
 
     @property
     def requirement_stack(self):
@@ -67,9 +72,9 @@ class BaseStep:
     def single_step(self):
         return self.pipe.single_step
 
-    @property
-    def single_step(self):
-        return self.pipe.single_step
+    def disk_step(self, session, extra=""):
+        disk_object = self.get_disk_object(session, extra)
+        return disk_object.disk_step_instance()
 
     def __call__(self, *args, **kwargs):
         return self.worker(*args, **kwargs)
@@ -77,47 +82,69 @@ class BaseStep:
     def __repr__(self):
         return f"<{self.pipe_name}.{self.step_name} StepObject>"
 
-    def is_step_child(self, step_name):
-        step = self.pipe.steps[step_name]
+    @property
+    def load(self):
+        return self.get_load_wrapped()
 
-        ...
+    @property
+    def save(self):
+        return self.get_save_wrapped()
 
-    def object(self):
-        #TODO : return current output of the pipe object, with version matching the hierarchy 
-        print(self.full_name)
-        ...
+    @property
+    def generate(self):
+        return self.get_generate_wrapped()
 
-    def make_wrapped_functions(self):
-        self.save = self.make_wrapped_save()
-        self.load = self.make_wrapped_load()
-        self.generate = self.make_wrapped_generate()
+    # def make_wrapped_functions(self):
+    #     self.save = self.make_wrapped_save()
+    #     self.load = self.make_wrapped_load()
+    #     self.generate = self.make_wrapped_generate()
 
-    def make_wrapped_save(self):
+    def get_save_wrapped(self):
         @wraps(self.pipe.disk_class.save)
-        def wrapper(session, data, extra=""):
+        def wrapper(session, data, extra=None):
+            if extra is None:
+                extra = self.get_default_extra()
             self.pipeline.resolve()
-            disk_object = self.pipe.disk_class(session, self, extra=extra)
-            disk_object.check_disk()
+            disk_object = self.get_disk_object(session, extra)
             return disk_object.save(data)
 
-        return self.pipe.dispatcher(wrapper)
+        if self.do_dispatch:
+            return self.pipe.dispatcher(wrapper, "saver")
+        return wrapper
 
-    def make_wrapped_load(self):
+    def get_load_wrapped(self):
         @wraps(self.pipe.disk_class.load)
-        def wrapper(session, extra=""):
+        def wrapper(session, extra=None):
+            # print("extra in load wrapper : ", extra)
+            if extra is None:
+                extra = self.get_default_extra()
+            # print("extra in load wrapper after None : ", extra)
             self.pipeline.resolve()
-            disk_object = self.pipe.disk_class(session, self, extra=extra)
-            disk_object.check_disk()
+            disk_object = self.get_disk_object(session, extra)
+            if not disk_object.is_matching():
+                raise ValueError(disk_object.get_status_message())
             return disk_object.load()
 
-        return self.pipe.dispatcher(wrapper)
+        if self.do_dispatch:
+            return self.pipe.dispatcher(wrapper, "loader")
+        return wrapper
 
-    def make_wrapped_generate(self):
-        return self.pipe.dispatcher(loggedmethod(self.generation_mechanism))
+    def get_generate_wrapped(self):
+        if self.do_dispatch:
+            return autoload_arguments(
+                self.pipe.dispatcher(
+                    loggedmethod(self.generation_mechanism), "generator"
+                ),
+                self,
+            )
+        return autoload_arguments(loggedmethod(self.generation_mechanism), self)
 
-    def get_level(self, selfish = False):
+    def get_level(self, selfish=False):
         self.pipeline.resolve()
-        return StepLevel(self).resolve_level(selfish = selfish)
+        return StepLevel(self).resolve_level(selfish=selfish)
+
+    def get_disk_object(self, session, extra):
+        return self.pipe.disk_class(session, self, extra)
 
     @property
     def generation_mechanism(self):
@@ -125,14 +152,20 @@ class BaseStep:
         def wrapper(
             session,
             *args,
-            extra="",
+            extra=None,
             skip=False,
             refresh=False,
+            refresh_all=False,
             run_requirements=False,
+            _tree_check=False,  # a flag used internally to signal the fact that we are runnning a check on versions
             save_output=True,
             **kwargs,
         ):
-            logger = logging.getLogger("generation")
+            logger = logging.getLogger(f"gen.{self.full_name}")
+
+            if extra is None:
+                extra = self.get_default_extra()
+
             self.pipeline.resolve()
 
             if refresh and skip:
@@ -143,104 +176,225 @@ class BaseStep:
                     Please change arguments according to your clarified intention."""
                 )
 
-            disk_object = self.pipe.disk_class(session, self, extra=extra)
+            if refresh_all:
+                refresh = True
+                run_requirements = True
 
-            if not refresh:
-                if disk_object.is_loadable() :
-                    if skip :
+            disk_object = self.get_disk_object(session, extra)
+
+            # this is a flag to skip after checking the requirement tree if skip is True and data is loadable
+            skip_after_tree = False
+
+            if not refresh and not refresh_all:
+                if disk_object.is_loadable():
+                    if disk_object.step_level_too_low():
                         logger.info(
-                            f"File exists for {self.pipe_name}{'.' + extra if extra else ''}. Loading and processing have been skipped"
+                            f"File(s) have been found but with a step too low in the requirement stack. Reloading the generation tree"
                         )
-                        return None
-                
-                    logger.debug(f"Found data. Trying to load it in generation context")
-                
-                    try:
-                        result = disk_object.load()
-                    except IOError as e:
-                        raise IOError(
-                            "The DiskObject returned True to `is_loadable()` but the loading procedure failed. Double check and test your DiskObject check_disk and load implementation"
-                        ) from e
+                        run_requirements = True
 
-                    logger.info(
-                        f"Loaded {self.pipe_name}{'.' + extra if extra else ''} file. Processing has been skipped "
-                    )
-                    return result
+                    elif disk_object.version_deprecated():
+                        logger.info(
+                            f"File(s) have been found but with an old version identifier. Reloading the generation tree"
+                        )
+                        run_requirements = True
+
+                    elif skip:
+                        logger.info(
+                            f"File exists for {self.full_name}{'.' + extra if extra else ''}. Loading and processing will be skipped"
+                        )
+                        if not run_requirements:
+                            return None
+
+                        # if we should skip but run_requirements is True, we just postpone the skip to after triggering the requirement tree
+                        skip_after_tree = True
+
+                    # if nor step_level_too_low, nor version_deprecated, nor skip, we load the is_loadable disk object
+                    else:
+                        logger.info(f"Found data. Trying to load it")
+
+                        try:
+                            result = disk_object.load()
+                        except IOError as e:
+                            raise IOError(
+                                f"The DiskObject responsible for loading {self.full_name} has `is_loadable() == True` but the loading procedure failed. Double check and test your DiskObject check_disk and load implementation. Check the original error above."
+                            ) from e
+
+                        logger.info(
+                            f"Loaded {self.full_name}{'.' + extra if extra else ''} sucessfully."
+                        )
+                        return result
                 else:
-                    if disk_object.version_deprecated() or disk_object.step_missing_requirements():
-                        logger.info(
-                            f"File(s) have been found but with a step too low in the requirement stack or with a wrong version identifier."
-                        )
-                    else :
-                        logger.info(
-                            f"Could not find or load {self.pipe_name}{'.' + extra if extra else ''} saved file."
-                        )
-            else :
+                    logger.info(
+                        f"Could not find or load {self.full_name}{'.' + extra if extra else ''} saved file."
+                    )
+            else:
                 logger.info(
                     f"`refresh` was set to True, ignoring the state of disk files and running the function."
                 )
 
-            if run_requirements :
-                for step in self.requires :
-                    logger.info(
-                        f"Running requirement {step.full_name}"
-                    )
-                    # check via generate **direct** steps recursively before continuing with current step run. 
-                    # If they are present, recursive checks will not be run
-                    step.generate(session, skip = True, run_requirements = True) 
-                    
+            if run_requirements:
+                if refresh_all:
+                    # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
+                    # forcing generation with refresh true on all the steps along the way.
+
+                    for step in self.requirement_stack():
+                        if self.pipe.pipe_name == step.pipe.pipe_name:
+                            _extra = extra
+                        else:
+                            _extra = step.pipe.default_extra
+
+                        # if refresh_all is not True but a list of things we should refresh, we parse it here
+                        _refresh = True
+                        if isinstance(refresh_all, list):
+                            _refresh = (
+                                True
+                                if step.pipe_name in refresh_all
+                                or step.full_name in refresh_all
+                                else False
+                            )
+
+                        step.generate(
+                            session, run_requirements=False, refresh=_refresh, extra=_extra
+                        )
+
+                else:
+                    # if we run_requirements but don't
+
+                    # if we want to only run requirements that would eventually be missing, we simply use the
+                    # generation mechanism on the direct requirements, and skip if we have them generated already.
+                    # the implementation will make them go down recursively to the bottom,
+                    # by making them checking their direct requirements with run_requirements = True, etc...
+                    # The only issue with this strategy is that is there is multiple redundant requirement information,
+                    # then the checks will be executed multiple times.
+                    # (The policy is that optimizing their requirement graph is the responsability of the user,
+                    # using the provided graph visualization tool, otherwise the implementation would be rendered over-complex)
+                    # TODO : in fact, this implementation could be as simple as running the reversed(requirement_stack) with run_requirements = False and skip = True....?
+
+                    # for step in reversed(self.requirement_stack()) :
+                    #     logger.info(
+                    #         f"Running requirement {step.full_name}"
+                    #     )
+                    #     step.generate(session, skip = True, run_requirements = False)
+
+                    for step in self.requires:
+                        logger.info(f"Running requirement {step.full_name}")
+                        # check via generate **direct** steps recursively before continuing with current step run.
+                        # If they are present, recursive checks will not be run
+                        if self.pipe.pipe_name == step.pipe.pipe_name:
+                            _extra = extra
+                        else:
+                            _extra = step.pipe.default_extra
+                        step.generate(
+                            session, skip=True, run_requirements=True, extra=_extra
+                        )
+
+            if skip_after_tree:
+                return None
 
             logger.info(
-                f"Performing the computation to generate {self.pipe_name}{'.' + extra if extra else ''}. Hold tight."
+                f"Performing the computation to generate {self.full_name}{'.' + extra if extra else ''}. Hold tight."
             )
-            result = self.pipe.pre_run_wrapper(self.worker(session, *args, extra=extra, **kwargs))
+            result = self.pipe.pre_run_wrapper(
+                self.worker(session, *args, extra=extra, **kwargs)
+            )
 
             if save_output:
                 logger.info(
-                    f"Saving the generated output : {self.pipe_name}{'.' + extra if extra else ''}."
+                    f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output."
                 )
                 disk_object.save(result)
             return result
+
+        original_signature = inspect.signature(self.worker)
+        original_params = list(original_signature.parameters.values())
+
+        kwarg_position = len(original_params)
+
+        if any([p.kind == p.VAR_KEYWORD for p in original_params]):
+            kwarg_position = kwarg_position - 1
+
+        # Create new parameters for the generation arguments and add them to the list
+        new_params = [
+            inspect.Parameter("skip", inspect.Parameter.KEYWORD_ONLY, default=False),
+            inspect.Parameter("refresh", inspect.Parameter.KEYWORD_ONLY, default=False),
+            inspect.Parameter(
+                "run_requirements", inspect.Parameter.KEYWORD_ONLY, default=False
+            ),
+            inspect.Parameter(
+                "save_output", inspect.Parameter.KEYWORD_ONLY, default=True
+            ),
+        ]
+
+        # inserting the new params before the kwargs param if there is one.
+        original_params = (
+            original_params[:kwarg_position]
+            + new_params
+            + original_params[kwarg_position:]
+        )
+
+        # Replace the wrapper function's signature with the new one
+        wrapper.__signature__ = original_signature.replace(parameters=original_params)
+
         return wrapper
-    
+
+    def get_default_extra(self):
+        """Get default value of a function's parameter"""
+        sig = inspect.signature(self.worker)
+        param = sig.parameters.get("extra")
+        if param is None:
+            raise ValueError(f"Parameter extra not found in function {self.full_name}")
+        if param.default is param.empty:
+            raise ValueError(f"Parameter extra does not have a default value")
+        return param.default
+
+    def load_requirement(self, pipe_name, session, extra):
+        try:
+            req_step = [
+                step for step in self.requirement_stack() if step.pipe_name == pipe_name
+            ][-1]
+        except IndexError as e:
+            raise IndexError(
+                f"Could not find a required step with the pipe_name {pipe_name} for the step {self.full_name}. Are you sure it figures in the requirement stack ?"
+            ) from e
+        return req_step.load(session, extra=extra)
+
+
 @dataclass
 class StepLevel:
-    level : int = None
+    level: int = None
 
     def __init__(self, step):
-
         self.requires = self.instanciate(step.requires)
         self.pipe_name = step.pipe_name
 
-    def instanciate(self,requirements):
-        
+    def instanciate(self, requirements):
         new_req = []
-        for req in requirements : 
+        for req in requirements:
             req = StepLevel(req)
             new_req.append(req)
         return new_req
 
-    def resolve_level(self, selfish = False):
-
-        if selfish != False and selfish == True :
+    def resolve_level(self, selfish=False):
+        if selfish != False and selfish == True:
             selfish = self
 
-        if self.level is not None :
+        if self.level is not None:
             return self.level
-        
+
         if len(self.requires) == 0:
             self.level = 0
             return self.level
-        
+
         levels = []
-        for req in self.requires :
-            if selfish != False and selfish.pipe_name != req.pipe_name :
+        for req in self.requires:
+            if selfish != False and selfish.pipe_name != req.pipe_name:
                 continue
             levels.append(req.resolve_level(selfish))
 
         if len(levels) == 0:
             self.level = 0
             return self.level
-        
+
         self.level = max(levels) + 1
         return self.level

@@ -1,4 +1,11 @@
 from pandas.api.extensions import register_series_accessor, register_dataframe_accessor
+import pandas as pd
+
+try:
+    #delete the accessor to avoid warning 
+    del pd.Series.pipeline
+except AttributeError:
+    pass
 
 @register_series_accessor("pipeline")
 class SeriesPipelineAcessor:
@@ -48,6 +55,11 @@ class SeriesPipelineAcessor:
             return self._obj.date.strftime(format)
         return str(self._obj.date)
 
+try:
+    #delete the accessor to avoid warning 
+    del pd.DataFrame.pipeline
+except AttributeError:
+    pass
 @register_dataframe_accessor("pipeline")
 class DataFramePipelineAcessor:
     def __init__(self, pandas_obj) -> None:
