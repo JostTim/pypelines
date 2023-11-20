@@ -164,6 +164,21 @@ class BaseStep:
             save_output=True,
             **kwargs,
         ):
+            """
+            skip=False
+                if True, that step doesn't gets loaded if it is found on the drive, and just gets a return None. It cannot be set to True at the same time than refresh.
+            refresh=False
+                if True, that step's value gets refreshed instead of used from a file, even if there is one.
+            refresh_requirements=False,
+                if True, all the requirements are also refreshed. If false, no requirement gets refreshed. If a list of strings, the steps/pipes matching names are refreshed, and not the other ones. It doesn't refresh the current step, even if the name of the current step is inside the strings. For that, use refresh = True.
+                Note that the behaviour in case a file exists for the current step level and we set refresh_requirements to something else than False, is that the file's content is returned ( if not skip, otherwise we just return None ), and we don't run any requirement.
+                To force the refresh of current step + prior refresh of requirements, we would need to set refresh to True and refresh_requirements to True or list of strings.
+            run_requirements=False,
+                if True, the requirements are checked with skip = True, to verify that they exist on drive, and get generated otherwise. This is automatically set to true if refresh_requirements is not False.
+            save_output=True,
+                if False, we don't save the output to file after calculation. If there is not calculation (file exists and refresh is False), this has no effect. If True, we save the file after calculation.
+            """
+
             logger = logging.getLogger(f"gen.{self.full_name}")
 
             if extra is None:
@@ -206,7 +221,7 @@ class BaseStep:
                         logger.info(
                             f"File exists for {self.full_name}{'.' + extra if extra else ''}. Loading and processing will be skipped"
                         )
-                        if not run_requirements:
+                        if not run_requirements or refresh_requirements != False:
                             return None
 
                         # if we should skip but run_requirements is True, we just postpone the skip to after triggering the requirement tree
