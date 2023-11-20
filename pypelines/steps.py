@@ -9,7 +9,7 @@ from types import MethodType
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .pipelines import BasePipeline
+    from .pipelines import Pipeline
     from .pipes import BasePipe
     from .disk import BaseDiskObject
 
@@ -32,7 +32,7 @@ def stepmethod(requires=[], version=None, do_dispatch=True):
 class BaseStep:
     def __init__(
         self,
-        pipeline: "BasePipeline",
+        pipeline: "Pipeline",
         pipe: "BasePipe",
         worker: MethodType,
     ):
@@ -55,6 +55,8 @@ class BaseStep:
 
         update_wrapper(self, self.worker)
         # update_wrapper(self.generate, self.worker)
+
+        self.multisession = self.pipe.multisession_class(self)
 
     @property
     def requirement_stack(self):
@@ -143,7 +145,9 @@ class BaseStep:
         self.pipeline.resolve()
         return StepLevel(self).resolve_level(selfish=selfish)
 
-    def get_disk_object(self, session, extra):
+    def get_disk_object(self, session, extra=None):
+        if extra is None:
+            extra = self.get_default_extra()
         return self.pipe.disk_class(session, self, extra)
 
     @property
@@ -155,9 +159,8 @@ class BaseStep:
             extra=None,
             skip=False,
             refresh=False,
-            refresh_all=False,
+            refresh_requirements=False,
             run_requirements=False,
-            _tree_check=False,  # a flag used internally to signal the fact that we are runnning a check on versions
             save_output=True,
             **kwargs,
         ):
@@ -176,8 +179,8 @@ class BaseStep:
                     Please change arguments according to your clarified intention."""
                 )
 
-            if refresh_all:
-                refresh = True
+            if refresh_requirements:
+                # if skip is True, and refresh_requirements is not None, we still make it possible, so that you can reprocess only if the file doen't exist
                 run_requirements = True
 
             disk_object = self.get_disk_object(session, extra)
@@ -185,7 +188,7 @@ class BaseStep:
             # this is a flag to skip after checking the requirement tree if skip is True and data is loadable
             skip_after_tree = False
 
-            if not refresh and not refresh_all:
+            if not refresh:
                 if disk_object.is_loadable():
                     if disk_object.step_level_too_low():
                         logger.info(
@@ -234,7 +237,7 @@ class BaseStep:
                 )
 
             if run_requirements:
-                if refresh_all:
+                if refresh_requirements:
                     # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
                     # forcing generation with refresh true on all the steps along the way.
 
@@ -244,18 +247,25 @@ class BaseStep:
                         else:
                             _extra = step.pipe.default_extra
 
-                        # if refresh_all is not True but a list of things we should refresh, we parse it here
+                        # if refresh_requirements is not True but a list of things we should refresh, we parse it here
                         _refresh = True
-                        if isinstance(refresh_all, list):
+                        if isinstance(refresh_requirements, list):
                             _refresh = (
                                 True
-                                if step.pipe_name in refresh_all
-                                or step.full_name in refresh_all
+                                if step.pipe_name
+                                in refresh_requirements  # todo : improve the matching system a bit better in case step names collide ?
+                                or step.full_name in refresh_requirements
                                 else False
                             )
+                        # if the step is not refreshed, we skip it so that run_requirements doesn't trigger if it is found and we don't load the data (process goes faster this way)
+                        _skip = not _refresh
 
                         step.generate(
-                            session, run_requirements=False, refresh=_refresh, extra=_extra
+                            session,
+                            run_requirements=True,
+                            refresh=_refresh,
+                            extra=_extra,
+                            skip=_skip,
                         )
 
                 else:
@@ -362,8 +372,6 @@ class BaseStep:
 
 @dataclass
 class StepLevel:
-    level: int = None
-
     def __init__(self, step):
         self.requires = self.instanciate(step.requires)
         self.pipe_name = step.pipe_name
@@ -376,25 +384,29 @@ class StepLevel:
         return new_req
 
     def resolve_level(self, selfish=False):
+        # if selfish is True, it gets transformed to the instance of StepLevel and gets passed down to the rest.
+        # we also set substract to 1 to remember to remove 1 at the end of the uppermost resolve_level, to stay 0 based
         if selfish != False and selfish == True:
             selfish = self
+            substract = 1
+        # if selfish is False, it get passed down as a False to everything, and never changes value
+        # in that case, we don't need to remove 1 at the end.
+        else:
+            substract = 0
 
-        if self.level is not None:
-            return self.level
-
-        if len(self.requires) == 0:
-            self.level = 0
-            return self.level
+        # if we are in selfish mode and found requirements but we are not currentely in a step that has the same pipe as the uppermost step on wich resolve_level is called, we don't increment level values
+        if selfish != False and selfish.pipe_name != self.pipe_name:
+            add = 0
+        # otherwise, we add one at the end of the requirement stack for that step
+        else:
+            add = 1
 
         levels = []
         for req in self.requires:
-            if selfish != False and selfish.pipe_name != req.pipe_name:
-                continue
             levels.append(req.resolve_level(selfish))
 
+        # we only add values if that step has at least one requirement
         if len(levels) == 0:
-            self.level = 0
-            return self.level
+            return 0
 
-        self.level = max(levels) + 1
-        return self.level
+        return max(levels) + add - substract

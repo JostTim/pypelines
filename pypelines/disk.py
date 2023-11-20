@@ -9,11 +9,13 @@ from abc import ABCMeta, abstractmethod
 if TYPE_CHECKING:
     from .steps import BaseStep
 
+
 class OutputData(Protocol):
     """Can be a mapping, iterable, single element, or None.
 
     This class is defined for typehints, and is not a real class useable at runtime"""
-    
+
+
 class BaseDiskObject(metaclass=ABCMeta):
     step_traceback: Literal["none", "single", "multi"] = "none"
 
@@ -29,9 +31,9 @@ class BaseDiskObject(metaclass=ABCMeta):
         self.session = session
         self.step = step
         self.extra = extra
-        
+
         self.loadable = self.check_disk()
-    
+
     @property
     def object_name(self):
         return f"{self.step.full_name}{'.'+self.extra if self.extra else ''}"
@@ -43,7 +45,6 @@ class BaseDiskObject(metaclass=ABCMeta):
     @abstractmethod
     def step_level_too_low(self) -> bool:
         return False
-
 
     @abstractmethod
     def check_disk(self) -> bool:
@@ -66,9 +67,17 @@ class BaseDiskObject(metaclass=ABCMeta):
         it should raise IOError"""
         ...
 
+    @staticmethod
+    def multisession_packer(sessions, session_result_dict):
+        raise NotImplementedError
+
+    @staticmethod
+    def multisession_unpacker(sessions, datas):
+        raise NotImplementedError
+
     def disk_step_instance(self) -> "BaseStep":
         """Returns an instance of the step that corresponds to the file on disk."""
-        if self.disk_step is not None :
+        if self.disk_step is not None:
             return self.step.pipe.steps[self.disk_step]
         return None
 
@@ -83,16 +92,28 @@ class BaseDiskObject(metaclass=ABCMeta):
 
     def is_loadable(self) -> bool:
         return self.loadable
-    
-    def get_found_disk_object_description(self) -> str :
+
+    def get_found_disk_object_description(self) -> str:
         return ""
- 
+
     def get_status_message(self):
-        loadable_disk_message = "A disk object is loadable. " if self.is_loadable() else ""
+        loadable_disk_message = (
+            "A disk object is loadable. " if self.is_loadable() else ""
+        )
         deprecated_disk_message = f"This object's version is { 'deprecated' if self.version_deprecated() else 'the current one' }. "
         step_level_disk_message = f"This object's step level is { 'too low' if self.step_level_too_low() else f'at least equal or above the {self.step.step_name} step' }. "
-        
-        loadable_disk_message = loadable_disk_message + deprecated_disk_message + step_level_disk_message if loadable_disk_message else loadable_disk_message
-        
-        found_disk_object_description = "The disk object found is : " + self.get_found_disk_object_description() + ". " if self.get_found_disk_object_description() else ""
+
+        loadable_disk_message = (
+            loadable_disk_message + deprecated_disk_message + step_level_disk_message
+            if loadable_disk_message
+            else loadable_disk_message
+        )
+
+        found_disk_object_description = (
+            "The disk object found is : "
+            + self.get_found_disk_object_description()
+            + ". "
+            if self.get_found_disk_object_description()
+            else ""
+        )
         return f"{self.object_name} object has{ ' a' if self.is_matching() else ' no' } valid disk object found. {found_disk_object_description}{loadable_disk_message}"

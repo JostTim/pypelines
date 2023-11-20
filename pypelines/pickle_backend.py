@@ -48,7 +48,7 @@ class PickleDiskObject(BaseDiskObject):
 
         # if we didn't found the disk step, we return False.
         # it's not labeled as "too low" for retro-compatibility
-        if disk_step is None :
+        if disk_step is None:
             return False
 
         # we compare levels with the currently called step
@@ -174,7 +174,7 @@ class PickleDiskObject(BaseDiskObject):
                 f"More than one partial match was found for {self.step.full_name}. Cannot auto select. Expected : {expected_values}, Found : {match_datas}"
             )
             return False
-    
+
     def get_found_disk_object_description(self):
         return str(self.current_disk_file)
 
@@ -200,10 +200,12 @@ class PickleDiskObject(BaseDiskObject):
             and self.remove
         ):
             logger.debug(f"Removing old file from path : {self.current_disk_file}")
-            try : 
+            try:
                 os.remove(self.current_disk_file)
-            except FileNotFoundError :
-                logger.error(f"The file {self.current_disk_file} that should have been removed don't exist anymore")
+            except FileNotFoundError:
+                logger.error(
+                    f"The file {self.current_disk_file} that should have been removed don't exist anymore"
+                )
         self.current_disk_file = new_full_path
 
     def load(self):
@@ -231,6 +233,72 @@ class PickleDiskObject(BaseDiskObject):
             self.is_legacy_format = False
 
         return data
+
+    @staticmethod
+    def multisession_packer(sessions, session_result_dict: dict) -> pd.DataFrame | dict:
+        are_dataframe = [
+            isinstance(item, pd.core.frame.DataFrame)
+            for item in session_result_dict.values()
+        ]
+
+        session_result_dict = {
+            sessions.loc[key].u_alias: value
+            for key, value in session_result_dict.items()
+        }  # replace indices from session id with session u_alias
+
+        if not all(are_dataframe):
+            return session_result_dict
+
+        return PickleDiskObject.get_multi_session_df(
+            session_result_dict, add_session_level=False
+        )
+
+    @staticmethod
+    def get_multi_session_df(
+        multisession_data_dict: dict, add_session_level: bool = False
+    ) -> pd.DataFrame:
+        dataframes = []
+        for session_name, dataframe in multisession_data_dict.items():
+            level_names = list(dataframe.index.names)
+
+            dataframe = dataframe.reset_index()
+
+            if add_session_level:
+                dataframe["session#"] = [session_name] * len(dataframe)
+                dataframe = dataframe.set_index(
+                    ["session#"] + level_names, inplace=False
+                )
+
+            else:
+                level_0_copy = dataframe[level_names[0]].copy()
+                dataframe[level_names[0].replace("#", "")] = level_0_copy
+                dataframe["session"] = [session_name] * len(dataframe)
+
+                dataframe[level_names[0]] = dataframe[level_names[0]].apply(
+                    PickleDiskObject.merge_index_element, session_name=session_name
+                )
+                dataframe = dataframe.set_index(level_names)
+
+            dataframes.append(dataframe)
+
+        multisession_dataframe = pd.concat(dataframes)
+        return multisession_dataframe
+
+    @staticmethod
+    def merge_index_element(
+        values: tuple | str | float | int, session_name: str
+    ) -> tuple:
+        if not isinstance(values, tuple):
+            values = (values,)
+
+        new_values = []
+        for value in values:
+            value = str(value) + "_" + session_name
+            new_values.append(value)
+
+        if len(new_values) == 1:
+            return new_values[0]
+        return tuple(new_values)
 
 
 class PicklePipe(BasePipe):
@@ -289,7 +357,7 @@ def files(
         raise ValueError(
             f"Can only list files in a directory. A file was given : {input_path}"
         )
-    
+
     if not os.path.isdir(input_path):
         # the given directory does not exist, we return an empty list to notify no file was found
         return []
