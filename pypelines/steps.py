@@ -160,7 +160,7 @@ class BaseStep:
             skip=False,
             refresh=False,
             refresh_requirements=False,
-            run_requirements=False,
+            check_requirements=False,
             save_output=True,
             **kwargs,
         ):
@@ -173,7 +173,7 @@ class BaseStep:
                 if True, all the requirements are also refreshed. If false, no requirement gets refreshed. If a list of strings, the steps/pipes matching names are refreshed, and not the other ones. It doesn't refresh the current step, even if the name of the current step is inside the strings. For that, use refresh = True.
                 Note that the behaviour in case a file exists for the current step level and we set refresh_requirements to something else than False, is that the file's content is returned ( if not skip, otherwise we just return None ), and we don't run any requirement.
                 To force the refresh of current step + prior refresh of requirements, we would need to set refresh to True and refresh_requirements to True or list of strings.
-            run_requirements=False,
+            check_requirements=False,
                 if True, the requirements are checked with skip = True, to verify that they exist on drive, and get generated otherwise. This is automatically set to true if refresh_requirements is not False.
             save_output=True,
                 if False, we don't save the output to file after calculation. If there is not calculation (file exists and refresh is False), this has no effect. If True, we save the file after calculation.
@@ -188,15 +188,15 @@ class BaseStep:
 
             if refresh and skip:
                 raise ValueError(
-                    """You tried to set refresh (or refresh_main_only) to True and skipping to True simultaneouly. 
-                    Stopped code to prevent mistakes : You probably set this by error as both have antagonistic effects. 
-                    (skipping passes without loading if file exists, refresh overwrites after generating output if file exists) 
+                    """You tried to set refresh (or refresh_main_only) to True and skipping to True simultaneouly.
+                    Stopped code to prevent mistakes : You probably set this by error as both have antagonistic effects.
+                    (skipping passes without loading if file exists, refresh overwrites after generating output if file exists)
                     Please change arguments according to your clarified intention."""
                 )
 
             if refresh_requirements:
                 # if skip is True, and refresh_requirements is not None, we still make it possible, so that you can reprocess only if the file doen't exist
-                run_requirements = True
+                check_requirements = True
 
             disk_object = self.get_disk_object(session, extra)
 
@@ -207,29 +207,32 @@ class BaseStep:
                 if disk_object.is_loadable():
                     if disk_object.step_level_too_low():
                         logger.info(
-                            f"File(s) have been found but with a step too low in the requirement stack. Reloading the generation tree"
+                            "File(s) have been found but with a step too low in the requirement stack. Reloading the generation tree"
                         )
-                        run_requirements = True
+                        check_requirements = True
 
                     elif disk_object.version_deprecated():
                         logger.info(
-                            f"File(s) have been found but with an old version identifier. Reloading the generation tree"
+                            "File(s) have been found but with an old version identifier. Reloading the generation tree"
                         )
-                        run_requirements = True
+                        check_requirements = True
 
                     elif skip:
                         logger.info(
                             f"File exists for {self.full_name}{'.' + extra if extra else ''}. Loading and processing will be skipped"
                         )
-                        if not run_requirements or refresh_requirements != False:
+                        if not check_requirements or refresh_requirements is not False:
                             return None
 
-                        # if we should skip but run_requirements is True, we just postpone the skip to after triggering the requirement tree
+                        # if we should skip but check_requirements is True, we just postpone the skip to after triggering the requirement tree
+                        # Note that or refresh_requirements != False means it does not trigger skip_after_tree in the case refresh_requirements is not False.
+                        # This is to avoid the strange behaviour that with skip false, it wouldn't run requirements, and with skip true, it would.
+                        # It would otherwise be counter intuitive given the fact that skip=True seem to imply we tend to avoid more steps while setting it to true than to false
                         skip_after_tree = True
 
-                    # if nor step_level_too_low, nor version_deprecated, nor skip, we load the is_loadable disk object
+                    # if not step_level_too_low, nor version_deprecated, nor skip, we load the is_loadable disk object
                     else:
-                        logger.info(f"Found data. Trying to load it")
+                        logger.info("Found data. Trying to load it")
 
                         try:
                             result = disk_object.load()
@@ -248,71 +251,47 @@ class BaseStep:
                     )
             else:
                 logger.info(
-                    f"`refresh` was set to True, ignoring the state of disk files and running the function."
+                    "`refresh` was set to True, ignoring the state of disk files and running the function."
                 )
 
-            if run_requirements:
-                if refresh_requirements:
-                    # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
-                    # forcing generation with refresh true on all the steps along the way.
+            if check_requirements:
+                # if refresh_requirements:
+                # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
+                # forcing generation with refresh true on all the steps along the way.
 
-                    for step in self.requirement_stack():
-                        if self.pipe.pipe_name == step.pipe.pipe_name:
-                            _extra = extra
-                        else:
-                            _extra = step.pipe.default_extra
+                for step in self.requirement_stack():
+                    logger.info(f"Running requirement {step.full_name}")
+                    if self.pipe.pipe_name == step.pipe.pipe_name:
+                        _extra = extra
+                    else:
+                        _extra = step.pipe.default_extra
 
-                        # if refresh_requirements is not True but a list of things we should refresh, we parse it here
+                    # by default, we don't refresh the step
+                    _refresh = False
+
+                    # if this is true, refresh_requirements is either True or a list of strings
+                    if bool(refresh_requirements):
+                        # then, by default, we refresh the step.
                         _refresh = True
+                        # if refresh_requirements is not True but a list of steps we should refresh, we parse it here to not refresh it if it is not included in the list of strings
                         if isinstance(refresh_requirements, list):
                             _refresh = (
                                 True
-                                if step.pipe_name
-                                in refresh_requirements  # todo : improve the matching system a bit better in case step names collide ?
+                                if step.pipe_name in refresh_requirements
                                 or step.full_name in refresh_requirements
                                 else False
                             )
-                        # if the step is not refreshed, we skip it so that run_requirements doesn't trigger if it is found and we don't load the data (process goes faster this way)
-                        _skip = not _refresh
 
-                        step.generate(
-                            session,
-                            run_requirements=True,
-                            refresh=_refresh,
-                            extra=_extra,
-                            skip=_skip,
-                        )
+                    # if the step is not refreshed, we skip it so that check_requirements doesn't trigger if it is found and we don't load the data (process goes faster this way)
+                    _skip = not _refresh
 
-                else:
-                    # if we run_requirements but don't
-
-                    # if we want to only run requirements that would eventually be missing, we simply use the
-                    # generation mechanism on the direct requirements, and skip if we have them generated already.
-                    # the implementation will make them go down recursively to the bottom,
-                    # by making them checking their direct requirements with run_requirements = True, etc...
-                    # The only issue with this strategy is that is there is multiple redundant requirement information,
-                    # then the checks will be executed multiple times.
-                    # (The policy is that optimizing their requirement graph is the responsability of the user,
-                    # using the provided graph visualization tool, otherwise the implementation would be rendered over-complex)
-                    # TODO : in fact, this implementation could be as simple as running the reversed(requirement_stack) with run_requirements = False and skip = True....?
-
-                    # for step in reversed(self.requirement_stack()) :
-                    #     logger.info(
-                    #         f"Running requirement {step.full_name}"
-                    #     )
-                    #     step.generate(session, skip = True, run_requirements = False)
-
-                    for step in self.requires:
-                        logger.info(f"Running requirement {step.full_name}")
-                        # check via generate **direct** steps recursively before continuing with current step run.
-                        # If they are present, recursive checks will not be run
-                        if self.pipe.pipe_name == step.pipe.pipe_name:
-                            _extra = extra
-                        else:
-                            _extra = step.pipe.default_extra
-                        step.generate(
-                            session, skip=True, run_requirements=True, extra=_extra
-                        )
+                    step.generate(
+                        session,
+                        check_requirements=False,
+                        refresh=_refresh,
+                        extra=_extra,
+                        skip=_skip,
+                    )
 
             if skip_after_tree:
                 return None
@@ -344,7 +323,10 @@ class BaseStep:
             inspect.Parameter("skip", inspect.Parameter.KEYWORD_ONLY, default=False),
             inspect.Parameter("refresh", inspect.Parameter.KEYWORD_ONLY, default=False),
             inspect.Parameter(
-                "run_requirements", inspect.Parameter.KEYWORD_ONLY, default=False
+                "refresh_requirements", inspect.Parameter.KEYWORD_ONLY, default=False
+            ),
+            inspect.Parameter(
+                "check_requirements", inspect.Parameter.KEYWORD_ONLY, default=False
             ),
             inspect.Parameter(
                 "save_output", inspect.Parameter.KEYWORD_ONLY, default=True
@@ -370,10 +352,10 @@ class BaseStep:
         if param is None:
             raise ValueError(f"Parameter extra not found in function {self.full_name}")
         if param.default is param.empty:
-            raise ValueError(f"Parameter extra does not have a default value")
+            raise ValueError("Parameter extra does not have a default value")
         return param.default
 
-    def load_requirement(self, pipe_name, session, extra):
+    def load_requirement(self, pipe_name, session, extra=None):
         try:
             req_step = [
                 step for step in self.requirement_stack() if step.pipe_name == pipe_name
@@ -401,7 +383,7 @@ class StepLevel:
     def resolve_level(self, selfish=False):
         # if selfish is True, it gets transformed to the instance of StepLevel and gets passed down to the rest.
         # we also set substract to 1 to remember to remove 1 at the end of the uppermost resolve_level, to stay 0 based
-        if selfish != False and selfish == True:
+        if selfish is not False and selfish is True:
             selfish = self
             substract = 1
         # if selfish is False, it get passed down as a False to everything, and never changes value
@@ -410,7 +392,7 @@ class StepLevel:
             substract = 0
 
         # if we are in selfish mode and found requirements but we are not currentely in a step that has the same pipe as the uppermost step on wich resolve_level is called, we don't increment level values
-        if selfish != False and selfish.pipe_name != self.pipe_name:
+        if selfish is not False and selfish.pipe_name != self.pipe_name:
             add = 0
         # otherwise, we add one at the end of the requirement stack for that step
         else:
