@@ -51,7 +51,7 @@ class BasePipe(metaclass=ABCMeta):
 
         if number_of_steps_with_requirements < len(self.steps) - 1:
             raise ValueError(
-                f"Steps of a single pipe must be linked in hierarchical order : Cannot have a single pipe with N steps (N>1) and have no `requires` specification for at least N-1 steps."
+                "Steps of a single pipe must be linked in hierarchical order : Cannot have a single pipe with N steps (N>1) and have no `requires` specification for at least N-1 steps."
             )
 
         # this loop populates self.steps and replacs the bound methods with usefull Step objects. They must inherit from BaseStep

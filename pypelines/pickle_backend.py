@@ -86,7 +86,7 @@ class PickleDiskObject(BaseDiskObject):
 
         steps_patterns = "|".join(steps_patterns)
 
-        version_pattern = rf"(?:\.(?P<version>[^\.]*))?"
+        version_pattern = r"(?:\.(?P<version>[^\.]*))?"
         step_pattern = rf"(?:\.(?P<step_name>{steps_patterns}){version_pattern})?"
 
         extra = self.parse_extra(self.extra, regexp=True)
@@ -220,7 +220,7 @@ class PickleDiskObject(BaseDiskObject):
             with open(self.current_disk_file, "rb") as f:
                 data = pickle.load(f)
         except ModuleNotFoundError as e:
-            logger.debug(f"Unable to load using generick pickling")
+            logger.debug("Unable to load using generick pickling")
             if "pandas" in e.__str__():
                 logger.debug("Trying out pandas read_pickle")
                 data = pd.read_pickle(self.current_disk_file)

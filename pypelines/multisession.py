@@ -34,11 +34,27 @@ class BaseMultisessionAccessor:
 
         return None
 
-    def generage(self, sessions, *args, extras=None, **kwargs):
+    def generate(self, sessions, *args, extras=None, extra=None, **kwargs):
         session_result_dict = {}
 
+        if extra is not None:
+            if extras is not None:
+                raise ValueError(
+                    "Ambiguous arguments extra and extras. "
+                    "They cannot be used at the same time.\n"
+                    "extra sets the same extra value for all session, "
+                    "while extras excepts a list like and "
+                    "allows to set one value per session (order based)"
+                )
+            extras = [extra] * len(sessions)
+        else:
+            if extras is None:
+                extras = [extras] * len(sessions)
         if not isinstance(extras, (list, tuple)):
-            extras = [extras] * len(sessions)
+            raise ValueError(
+                "if extras is used, it must be a list of the same size of the sessions number supplied. "
+                "If you want to supply a single value for all, use extra instead of extras"
+            )
 
         if len(extras) != len(sessions):
             raise ValueError(
@@ -46,7 +62,7 @@ class BaseMultisessionAccessor:
             )
 
         for (index, session), extra in zip(sessions.iterrows(), extras):
-            session_result_dict[index] = self.step.save(
+            session_result_dict[index] = self.step.generate(
                 session, *args, extra=extra, **kwargs
             )
 

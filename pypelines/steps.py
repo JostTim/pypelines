@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .disk import BaseDiskObject
 
 
-def stepmethod(requires=[], version=None, do_dispatch=True):
+def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]):
     # This  allows method  to register class methods inheriting of BasePipe as steps.
     # It basically just step an "is_step" stamp on the method that are defined as steps.
     # This stamp will later be used in the metaclass __new__ to set additionnal usefull attributes to those methods
@@ -24,6 +24,11 @@ def stepmethod(requires=[], version=None, do_dispatch=True):
         function.version = version
         function.do_dispatch = do_dispatch
         function.step_name = function.__name__
+        function.callbacks = (
+            [on_save_callbacks]
+            if not isinstance(on_save_callbacks, list)
+            else on_save_callbacks
+        )
         return function
 
     return registrate
@@ -48,6 +53,8 @@ class BaseStep:
         self.version = self.worker.version
         self.requires = self.worker.requires
         self.step_name = self.worker.step_name
+
+        self.callbacks = self.worker.callbacks
 
         self.worker = MethodType(worker.__func__, self)
 
@@ -308,6 +315,8 @@ class BaseStep:
                     f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output."
                 )
                 disk_object.save(result)
+                for callback in self.callbacks:
+                    callback(session=session, extra=extra, pipeline=self.pipeline)
             return result
 
         original_signature = inspect.signature(self.worker)
