@@ -315,6 +315,11 @@ class BaseStep:
                     f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output."
                 )
                 disk_object.save(result)
+
+                # AFTER the saving has been done, if there is some callback function that should be run, we execute them.
+                # If an exception is thrown in a callback, the whole pipeline will stop, intentionnaly.
+                # TODO an option could be added to catch, display and store exceptions tracebacks wile allowing the pipeline to continue,
+                # in case the callbacks are not absolutely necessary for the pipeline process. (ex, generate plots)
                 for callback in self.callbacks:
                     callback(session=session, extra=extra, pipeline=self.pipeline)
             return result
