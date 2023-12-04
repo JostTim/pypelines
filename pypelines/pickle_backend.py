@@ -236,15 +236,14 @@ class PickleDiskObject(BaseDiskObject):
 
     @staticmethod
     def multisession_packer(sessions, session_result_dict: dict) -> pd.DataFrame | dict:
+        session_result_dict = BaseDiskObject.multisession_packer(
+            sessions, session_result_dict
+        )
+
         are_dataframe = [
             isinstance(item, pd.core.frame.DataFrame)
             for item in session_result_dict.values()
         ]
-
-        session_result_dict = {
-            sessions.loc[key].u_alias: value
-            for key, value in session_result_dict.items()
-        }  # replace indices from session id with session u_alias
 
         if not all(are_dataframe):
             return session_result_dict

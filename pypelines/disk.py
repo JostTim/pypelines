@@ -5,6 +5,7 @@ import pickle
 from typing import Callable, Type, Iterable, Literal, Protocol, TYPE_CHECKING
 
 from abc import ABCMeta, abstractmethod
+from functools import wraps
 
 if TYPE_CHECKING:
     from .steps import BaseStep
@@ -67,9 +68,18 @@ class BaseDiskObject(metaclass=ABCMeta):
         it should raise IOError"""
         ...
 
+    # @staticmethod
+    # def multisession_packer(sessions, session_result_dict):
+    #     raise NotImplementedError
+
     @staticmethod
-    def multisession_packer(sessions, session_result_dict):
-        raise NotImplementedError
+    def multisession_packer(sessions, session_result_dict: dict) -> dict:
+        session_result_dict = {
+            sessions.loc[key].u_alias: value
+            for key, value in session_result_dict.items()
+        }  # replace indices from session id with session u_alias
+
+        return session_result_dict
 
     @staticmethod
     def multisession_unpacker(sessions, datas):
@@ -117,3 +127,94 @@ class BaseDiskObject(metaclass=ABCMeta):
             else ""
         )
         return f"{self.object_name} object has{ ' a' if self.is_matching() else ' no' } valid disk object found. {found_disk_object_description}{loadable_disk_message}"
+
+
+class NullDiskObject(BaseDiskObject):
+    def version_deprecated(self) -> bool:
+        return True
+
+    def step_level_too_low(self) -> bool:
+        return True
+
+    def check_disk(self) -> bool:
+        return False
+
+    def save(self, data: OutputData) -> None:
+        # data is not saved to disk
+        pass
+
+    def load(self) -> OutputData:
+        # this should never be called as check_disk always return False
+        raise NotImplementedError
+
+
+_CACHE_STORAGE = {}  # this cache variable is cross instances
+
+
+class CachedDiskObject(BaseDiskObject):
+    def __init__(self, session: Session, step: "BaseStep", extra="") -> None:
+        self.session = session
+        self.step = step
+        self.extra = extra
+        self.storage = _CACHE_STORAGE
+        self.loadable = self.check_disk()
+
+    def get_cached_storage(self):
+        if self.step.pipe not in self.storage:
+            self.storage[self.step.pipe] = {}
+
+        if self.session.name not in self.storage[self.step.pipe].keys():
+            self.storage[self.step.pipe][self.session.name] = {}
+
+        if (
+            str(self.extra)
+            not in self.storage[self.step.pipe][self.session.name].keys()
+        ):
+            stored_dict = self.save(None)
+        else:
+            stored_dict = self.storage[self.step.pipe][self.session.name][
+                str(self.extra)
+            ]
+
+        return stored_dict
+
+    def load(self):
+        return self.get_cached_storage()["content"]
+
+    def save(self, data):
+        stored_dict = {
+            "version": self.step.version,
+            "content": data,
+            "step": self.step.step_name,
+        }
+        self.storage[self.step.pipe][self.session.name][str(self.extra)] = stored_dict
+        return stored_dict
+
+    def check_disk(self):
+        stored_cache = self.get_cached_storage()
+        self.disk_version = stored_cache["version"]
+        self.disk_step = stored_cache["step"]
+
+        if stored_cache["content"] is None:
+            return False
+
+        return True
+
+    def version_deprecated(self):
+        if self.step.version != self.disk_version:
+            return True
+        return False
+
+    def step_level_too_low(self) -> bool:
+        # we get the step instance that corresponds to the one on the disk
+        disk_step = self.disk_step_instance()
+
+        # we compare levels with the currently called step
+        # if disk step level < current called step level, we return True, else we return False.
+        if disk_step.get_level(selfish=True) < self.step.get_level(selfish=True):
+            return True
+        return False
+
+    def clear_cache(self):
+        for pipe in list(self.storage.keys()):
+            self.storage.pop(pipe)

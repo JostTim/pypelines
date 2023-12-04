@@ -383,41 +383,102 @@ class BaseStep:
 
 @dataclass
 class StepLevel:
+    """A class used to represent the level of a Step.
+    This class helps track and manage step dependencies in a pipeline.
+
+    Attributes:
+        requires (list[StepLevel]): A list of step requirements.
+        pipe_name (str): The name of the pipeline this step is a part of.
+        step_name (str): The name of the step.
+
+    Methods :
+        instanciate(requirements: list): converts a list of requirements into instances of `StepLevel`.
+        resolve_level(selfish=bool, uppermost=None): calculates and returns the level of a step.
+    """
+
     def __init__(self, step):
+        """Constructs all necessary attributes for the StepLevel object.
+
+        Args:
+            step (Step): A Step instance having attributes `pipe_name`, `step_name`, and `requires`.
+        """
         self.requires = self.instanciate(step.requires)
         self.pipe_name = step.pipe_name
+        self.step_name = step.step_name
 
     def instanciate(self, requirements):
+        """
+        Converts each item in the passed list to an instance of `StepLevel`.
+
+        Args:
+            requirements (list): A list of step requirements.
+
+        Returns:
+            list: A list of StepLevel instances representing step requirements.
+        """
         new_req = []
         for req in requirements:
             req = StepLevel(req)
             new_req.append(req)
         return new_req
 
-    def resolve_level(self, selfish=False):
-        # if selfish is True, it gets transformed to the instance of StepLevel and gets passed down to the rest.
-        # we also set substract to 1 to remember to remove 1 at the end of the uppermost resolve_level, to stay 0 based
-        if selfish is not False and selfish is True:
-            selfish = self
-            substract = 1
-        # if selfish is False, it get passed down as a False to everything, and never changes value
-        # in that case, we don't need to remove 1 at the end.
-        else:
-            substract = 0
+    def resolve_level(self, selfish: bool = False, uppermost=None):
+        """Calculates and returns the "level" of the step.
 
-        # if we are in selfish mode and found requirements but we are not currentely in a step that has the same pipe as the uppermost step on wich resolve_level is called, we don't increment level values
-        if selfish is not False and selfish.pipe_name != self.pipe_name:
+        If `selfish` is True, only the requirements that are the same pipe as the `uppermost`
+        will be considered, others won't increment the level values. If `selfish` is False,
+        all requirements contribute to the step level.
+
+        Args:
+            selfish (bool, optional): A flag to specify if the StepLevel should count
+                just the level of requirements that are also on the same pipe. Defaults to False.
+            uppermost (StepLevel, optional): The uppermost level in the pipeline, defaults to self.
+
+        Returns:
+            int: The computed level of the step.
+        """
+
+        # if selfish is True, we only count the requirements that are the same pipe as the uppermost call
+
+        if uppermost is None:
+            uppermost = self
+
+        if uppermost == self:
             add = 0
-        # otherwise, we add one at the end of the requirement stack for that step
+
         else:
-            add = 1
+            if selfish and uppermost.pipe_name != self.pipe_name:
+                # if we are in selfish mode
+                # but we are not currentely in the same step as or a step that has the same pipe as the uppermost
+                # step on wich resolve_level is called, we don't increment level values
+                add = 0
+
+            else:
+                # otherwise, we add one at the end of the requirement stack for that step
+                add = 1
 
         levels = []
         for req in self.requires:
-            levels.append(req.resolve_level(selfish))
+            levels.append(req.resolve_level(selfish, uppermost))
 
-        # we only add values if that step has at least one requirement
+        # we cannot calculate max of an empty list, so we add one 0 here in case there is no requirements
         if len(levels) == 0:
-            return 0
+            levels = [0]
 
-        return max(levels) + add - substract
+        return max(levels) + add
+
+    def __eq__(self, value):
+        """Checks if this step is equal to the provided value based on `pipe_name` and `step_name`.
+
+        Args:
+            value (StepLevel): Another StepLevel instance to compare with.
+
+        Returns:
+            bool: True if both pipe_name and step_name are equal, False otherwise.
+        """
+        try:
+            if self.pipe_name == value.pipe_name and self.step_name == value.step_name:
+                return True
+            return False
+        except AttributeError:
+            return False
