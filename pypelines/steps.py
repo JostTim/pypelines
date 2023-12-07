@@ -321,7 +321,10 @@ class BaseStep:
                 # TODO an option could be added to catch, display and store exceptions tracebacks wile allowing the pipeline to continue,
                 # in case the callbacks are not absolutely necessary for the pipeline process. (ex, generate plots)
                 for callback in self.callbacks:
-                    callback(session=session, extra=extra, pipeline=self.pipeline)
+                    try:
+                        callback(session=session, extra=extra, pipeline=self.pipeline)
+                    except Exception as e:
+                        logger.error(f"The callback {callback} failed with error : {e}")
             return result
 
         original_signature = inspect.signature(self.worker)
