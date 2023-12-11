@@ -75,8 +75,7 @@ class BaseDiskObject(metaclass=ABCMeta):
     @staticmethod
     def multisession_packer(sessions, session_result_dict: dict) -> dict:
         session_result_dict = {
-            sessions.loc[key].u_alias: value
-            for key, value in session_result_dict.items()
+            sessions.loc[key].u_alias: value for key, value in session_result_dict.items()
         }  # replace indices from session id with session u_alias
 
         return session_result_dict
@@ -92,11 +91,7 @@ class BaseDiskObject(metaclass=ABCMeta):
         return None
 
     def is_matching(self):
-        if (
-            self.is_loadable()
-            and not self.version_deprecated()
-            and not self.step_level_too_low()
-        ):
+        if self.is_loadable() and not self.version_deprecated() and not self.step_level_too_low():
             return True
         return False
 
@@ -107,11 +102,14 @@ class BaseDiskObject(metaclass=ABCMeta):
         return ""
 
     def get_status_message(self):
-        loadable_disk_message = (
-            "A disk object is loadable. " if self.is_loadable() else ""
+        loadable_disk_message = "A disk object is loadable. " if self.is_loadable() else ""
+        deprecated_disk_message = (
+            f"This object's version is { 'deprecated' if self.version_deprecated() else 'the current one' }. "
         )
-        deprecated_disk_message = f"This object's version is { 'deprecated' if self.version_deprecated() else 'the current one' }. "
-        step_level_disk_message = f"This object's step level is { 'too low' if self.step_level_too_low() else f'at least equal or above the {self.step.step_name} step' }. "
+        step_level_disk_message = (
+            "This object's step level is"
+            f" {'too low' if self.step_level_too_low() else f'at least equal or above the {self.step.step_name} step'}"
+        )
 
         loadable_disk_message = (
             loadable_disk_message + deprecated_disk_message + step_level_disk_message
@@ -120,13 +118,14 @@ class BaseDiskObject(metaclass=ABCMeta):
         )
 
         found_disk_object_description = (
-            "The disk object found is : "
-            + self.get_found_disk_object_description()
-            + ". "
+            "The disk object found is : " + self.get_found_disk_object_description() + ". "
             if self.get_found_disk_object_description()
             else ""
         )
-        return f"{self.object_name} object has{ ' a' if self.is_matching() else ' no' } valid disk object found. {found_disk_object_description}{loadable_disk_message}"
+        return (
+            f"{self.object_name} object has{ ' a' if self.is_matching() else ' no' } valid disk object found."
+            f" {found_disk_object_description}{loadable_disk_message}"
+        )
 
 
 class NullDiskObject(BaseDiskObject):
@@ -166,15 +165,10 @@ class CachedDiskObject(BaseDiskObject):
         if self.session.name not in self.storage[self.step.pipe].keys():
             self.storage[self.step.pipe][self.session.name] = {}
 
-        if (
-            str(self.extra)
-            not in self.storage[self.step.pipe][self.session.name].keys()
-        ):
+        if str(self.extra) not in self.storage[self.step.pipe][self.session.name].keys():
             stored_dict = self.save(None)
         else:
-            stored_dict = self.storage[self.step.pipe][self.session.name][
-                str(self.extra)
-            ]
+            stored_dict = self.storage[self.step.pipe][self.session.name][str(self.extra)]
 
         return stored_dict
 

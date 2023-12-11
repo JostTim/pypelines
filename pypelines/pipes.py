@@ -19,7 +19,8 @@ class BasePipe(metaclass=ABCMeta):
 
     default_extra = None
 
-    single_step: bool = False  # a flag to tell the initializer to bind the unique step of this pipe in place of the pipe itself, to the registered pipeline.
+    single_step: bool = False  # a flag to tell the initializer to bind the unique step of this pipe in place
+    # of the pipe itself, to the registered pipeline.
     step_class: BaseStep = BaseStep
     disk_class: BaseDiskObject = BaseDiskObject
     multisession_class: BaseMultisessionAccessor = BaseMultisessionAccessor
@@ -36,12 +37,14 @@ class BasePipe(metaclass=ABCMeta):
 
         if len(self.steps) < 1:
             raise ValueError(
-                f"You should register at least one step class with @stepmethod in {self.pipe_name} class. { self.steps = }"
+                f"You should register at least one step class with @stepmethod in {self.pipe_name} class."
+                f" { self.steps = }"
             )
 
         if len(self.steps) > 1 and self.single_step:
             raise ValueError(
-                f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class. { self.steps = }"
+                f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class."
+                f" { self.steps = }"
             )
 
         number_of_steps_with_requirements = 0
@@ -51,15 +54,16 @@ class BasePipe(metaclass=ABCMeta):
 
         if number_of_steps_with_requirements < len(self.steps) - 1:
             raise ValueError(
-                "Steps of a single pipe must be linked in hierarchical order : Cannot have a single pipe with N steps (N>1) and have no `requires` specification for at least N-1 steps."
+                "Steps of a single pipe must be linked in hierarchical order : Cannot have a single pipe with N steps"
+                " (N>1) and have no `requires` specification for at least N-1 steps."
             )
 
-        # this loop populates self.steps and replacs the bound methods with usefull Step objects. They must inherit from BaseStep
+        # this loop populates self.steps and replacs the bound methods with usefull Step objects.
+        # They must inherit from BaseStep
         for step_name, step in self.steps.items():
             step = self.step_class(self.pipeline, self, step)  # , step_name)
-            self.steps[
-                step_name
-            ] = step  # replace the bound_method by a step_class using that bound method, so that we attach the necessary components to it.
+            self.steps[step_name] = step  # replace the bound_method by a step_class using that bound method,
+            # so that we attach the necessary components to it.
             setattr(self, step_name, step)
 
         # below is just a syntaxic sugar to help in case the pipe is "single_step"
@@ -87,12 +91,15 @@ class BasePipe(metaclass=ABCMeta):
             levels[step] = step.get_level(selfish=selfish)
 
         # if checking step levels internal to a single pipe,
-        # we disallow several steps having identical level if the saving backend doesn't allow for multi-step version identification
+        # we disallow several steps having identical level if the saving backend doesn't allow
+        # for multi-step version identification
         if selfish and self.disk_class.step_traceback != "multi":
-            # we make a set of all the values. if there is some duplicates, the length of the set will be smaller than the levels dict
+            # we make a set of all the values. if there is some duplicates,
+            # the length of the set will be smaller than the levels dict
             if len(set(levels.values())) != len(levels):
                 raise ValueError(
-                    f"The disk backend {self.disk_class} does not support multi step (step_traceback attribute). All steps of the pipe {self.pipe_name} must then be hierarchically organized"
+                    f"The disk backend {self.disk_class} does not support multi step (step_traceback attribute). All"
+                    f" steps of the pipe {self.pipe_name} must then be hierarchically organized"
                 )
 
         return levels
@@ -102,7 +109,8 @@ class BasePipe(metaclass=ABCMeta):
 
     # @abstractmethod
     # def disk_step(self, session : Session, extra = "") -> BaseStep :
-    #     #simply returns the pipe's (most recent in the step requirement order) step instance that corrresponds to the step that is found on the disk
+    #     #simply returns the pipe's (most recent in the step requirement order)
+    # step instance that corrresponds to the step that is found on the disk
     #     return None
 
     def dispatcher(self, function: Callable, dispatcher_type):
@@ -114,9 +122,7 @@ class BasePipe(metaclass=ABCMeta):
         return function
 
     def load(self, session, extra="", which: Literal["lowest", "highest"] = "highest"):
-        ordered_steps = sorted(
-            list(self.steps.values()), key=lambda item: item.get_level(selfish=True)
-        )
+        ordered_steps = sorted(list(self.steps.values()), key=lambda item: item.get_level(selfish=True))
 
         if which == "lowest":
             step = ordered_steps[0]
