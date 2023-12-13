@@ -1,9 +1,9 @@
-
 from functools import wraps
 from logging import getLogger
 import json, re, os
 
-def read_json_file(json_file : str):
+
+def read_json_file(json_file: str):
     """Loads a Json file that can have some comments indicated with // after a line.
 
     Args:
@@ -23,13 +23,15 @@ def read_json_file(json_file : str):
     # loading the json format string without comments as a python dict
     return json.loads(json_no_comments)
 
-def read_session_arguments_file(session, step, file_suffix = "_arguments.json"):
+
+def read_session_arguments_file(session, step, file_suffix="_arguments.json"):
     file_name = step.pipeline.pipeline_name + file_suffix
-    try : 
+    try:
         path = os.path.join(session.path, file_name)
         return read_json_file(path)
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not open the config file {file_name} for the session {session.alias}")
+
 
 def autoload_arguments(wrapped_function, step):
     """Loads arguments for a pipeline step, using a config file unique to a given session.
@@ -49,10 +51,9 @@ def autoload_arguments(wrapped_function, step):
 
         config_kwargs = get_step_arguments(session, step)
         if config_kwargs:  # new_kwargs is not empty
-            local_log.info(
-                f"Using the arguments for the function {step.full_name} found in pipelines_arguments.json."
-            )
-        #this loop is just to show to log wich arguments have been overriden from the json config by some arguments in the code
+            local_log.info(f"Using the arguments for the function {step.full_name} found in pipelines_arguments.json.")
+        # this loop is just to show to log wich arguments have been overriden
+        # from the json config by some arguments in the code
         overrides_names = []
         for key in config_kwargs.keys():
             if key in kwargs.keys():
@@ -60,7 +61,8 @@ def autoload_arguments(wrapped_function, step):
 
         if overrides_names:
             local_log.info(
-                f"Values of pipelines_arguments.json arguments : {', '.join(overrides_names)}, are overrided by the current call arguments."
+                f"Values of pipelines_arguments.json arguments : {', '.join(overrides_names)}, are overrided by the"
+                " current call arguments."
             )
 
         config_kwargs.update(kwargs)
@@ -68,33 +70,20 @@ def autoload_arguments(wrapped_function, step):
 
     return wraper
 
+
 def get_step_arguments(session, step):
     local_log = getLogger("autoload_arguments")
 
     try:
         config_args = read_session_arguments_file(session, step)["functions"][step.full_name]
     except FileNotFoundError as e:
-        local_log.warning(f"{type(e).__name__} : {e}. Skipping")
+        local_log.debug(f"{type(e).__name__} : {e}. Skipping")
         return {}
     except KeyError:
-        local_log.warning(
-            f"Could not find the `functions` key or the key `{step.full_name}` in pipelines_arguments.json file at {session.path}. Skipping"
+        local_log.debug(
+            f"Could not find the `functions` key or the key `{step.full_name}` in pipelines_arguments.json file at"
+            f" {session.path}. Skipping"
         )
         return {}
-    
+
     return config_args
-
-    # args = {} # {key: value for key, value in config_args.items()}
-
-    # for key, value in config_args.items():
-    #     # if isinstance(value, str) and value.startswith("$"):
-    #     #     try:
-    #     #         # execute code to get custom values, example : exec("from ResearchProjects.adaptation import aliases;value = aliases.pw10_90")
-    #     #         exec(value[1:])
-    #     #     except Exception as e:
-    #     #         local_log.warning(
-    #     #             f"Could not evaluate expression : {value} for argument {key} in function {step.full_name}. Error : {type(e).__name__} : {e}. Passing"
-    #     #         )
-    #     #         continue
-    #     args[key] = value
-    # return args
