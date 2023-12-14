@@ -83,7 +83,7 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
     # as it would be more complex to implement otherwise, and for a small benefit.
 
     def __init__(self, fmt=None, datefmt=None, style="%", level_styles=None, field_styles=None, dynamic_levels=None):
-        self.dynamic_levels = dynamic_levels if dynamic_levels is not None else DYNAMIC_LEVELS
+        self.dynamic_levels = dynamic_levels
         super().__init__(
             fmt=fmt,
             datefmt=datefmt,
