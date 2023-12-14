@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 class BaseMultisessionAccessor:
     def __init__(self, parent):
         self.step = parent
@@ -62,8 +65,15 @@ class BaseMultisessionAccessor:
             )
 
         for (index, session), extra in zip(sessions.iterrows(), extras):
-            session_result_dict[index] = self.step.generate(
-                session, *args, extra=extra, **kwargs
-            )
+            session_result_dict[index] = self.step.generate(session, *args, extra=extra, **kwargs)
 
         return self._packer(sessions, session_result_dict)
+
+
+def assert_dataframe(sessions):
+    if isinstance(sessions, pd.DataFrame):
+        return True
+    elif isinstance(sessions, pd.Series):
+        raise ValueError("sessions argument appears to be a pandas series. Did you forgot to use a dataframe instead ?")
+    else:
+        raise ValueError(f"sessions argument must be a dataframe. It appears to be of type {type(sessions).__name__}")
