@@ -1,4 +1,4 @@
-import logging, sys
+import logging, sys, re
 from functools import wraps
 import coloredlogs
 
@@ -96,9 +96,6 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         )
 
     def get_length_pre_formaters(self, fmt):
-        import re
-
-        unallowed_part_names = [""]
 
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
