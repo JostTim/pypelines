@@ -1,4 +1,4 @@
-import logging, sys, re
+import logging, sys, re, os
 from functools import wraps
 import coloredlogs
 
@@ -96,7 +96,6 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         )
 
     def get_length_pre_formaters(self, fmt):
-
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
         padding_dict = {name: int(padding) if padding else 0 for name, padding in result}
@@ -114,11 +113,15 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
             copy.__class__ = record.__class__
             copy.__dict__.update(record.__dict__)
             for part_name, length in self.lenght_pre_formaters.items():
-                part = getattr(copy, part_name).ljust(length, " ")
+                part = getattr(copy, part_name)  # .ljust(length, " ")
+                real_length = len(part)
+                missing_length = length - real_length
+                missing_length = 0 if missing_length < 0 else missing_length
                 if part_name in self.dynamic_levels.keys():
                     dyn_keys = self.dynamic_levels[part_name]
                     dynamic_style = {k: v for k, v in style.items() if k in dyn_keys or dyn_keys == "all"}
                     part = coloredlogs.ansi_wrap(coloredlogs.coerce_string(part), **dynamic_style)
+                part = part + (" " * missing_length)
                 setattr(copy, part_name, part)
             record = copy
 
@@ -147,11 +150,8 @@ class SugarColoredFormatter(DynamicColoredFormatter):
         "critical": {"bold": True, "color": 124},
         "error": {"color": 9},
         "warning": {"color": 214},
-        "open": {
-            "color": 57,
-            "background": 195,
-        },
-        "close": {"color": 57, "background": 195},
+        "start": {"color": 195, "background": 57, "bold": True},
+        "end": {"color": 195, "background": 57, "bold": True},
         "header": {"color": 27, "underline": True, "bold": True},
         "load": {"color": 141, "italic": True},
         "save": {"color": 141, "italic": True},
@@ -165,7 +165,7 @@ class SugarColoredFormatter(DynamicColoredFormatter):
         "name": {"color": 19},
     }
     DYNAMIC_LEVELS = {
-        "message": ["color", "underline"],
+        "message": ["color", "bold", "background"],
         "levelname": "all",
         "name": "all",
     }
@@ -198,8 +198,12 @@ class FileFormatter(SugarColoredFormatter):
 
 
 class LogTask:
-    def __init__(self, worker_pk, level="INFO"):
+    def __init__(self, session, worker_pk, task_name, username="", level="LOAD"):
+        self.path = os.path.normpath(os.path.join(session.path, "logs"))
+        self.username = username
+        os.makedirs(self.path, exist_ok=True)
         self.worker_pk = worker_pk
+        self.task_name = task_name
         self.level = getattr(logging, level.upper())
 
     def __enter__(self):
@@ -211,9 +215,30 @@ class LogTask:
         self.remove_handler()
 
     def set_handler(self):
-        fh = logging.FileHandler(f"{self.worker_pk}.log")
+        filename = f"task_log.{self.task_name}.{self.worker_pk}.log"
+        fh = logging.FileHandler(os.path.join(self.path, filename))
+        f_formater = FileFormatter()
+        coloredlogs.HostNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            style=f_formater.STYLE,
+            use_chroot=True,
+        )
+        coloredlogs.ProgramNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            programname=self.task_name,
+            style=f_formater.STYLE,
+        )
+        coloredlogs.UserNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            username=self.username,
+            style=f_formater.STYLE,
+        )
+
         fh.setLevel(self.level)
-        fh.setFormatter(FileFormatter())
+        fh.setFormatter()
         self.logger.addHandler(fh)
 
     def remove_handler(self):
@@ -274,8 +299,8 @@ def add_all_custom_headers():
     addLoggingLevel("LOAD", logging.DEBUG + 1, if_exists="keep")
     addLoggingLevel("SAVE", logging.DEBUG + 2, if_exists="keep")
     addLoggingLevel("HEADER", logging.INFO + 1, if_exists="keep")
-    addLoggingLevel("OPEN", logging.INFO + 2, if_exists="keep")
-    addLoggingLevel("CLOSE", logging.INFO + 3, if_exists="keep")
+    addLoggingLevel("START", logging.INFO + 2, if_exists="keep")
+    addLoggingLevel("END", logging.INFO + 3, if_exists="keep")
 
 
 def addLoggingLevel(levelName, levelNum, methodName=None, if_exists="raise"):
@@ -300,7 +325,6 @@ def addLoggingLevel(levelName, levelNum, methodName=None, if_exists="raise"):
     >>> logging.getLogger(__name__).trace('that worked')
     >>> logging.trace('so did this')
     >>> logging.TRACE
-    5
 
     """
     if not methodName:
