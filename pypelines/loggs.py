@@ -2,13 +2,21 @@ import logging, sys, re, os
 from functools import wraps
 import coloredlogs
 
-NAMELENGTH = 33
-LEVELLENGTH = 8
+NAMELENGTH = 33  # global variable for fromatting the length of the padding dedicated to name part in a logging record
+LEVELLENGTH = 8  # global variable for fromatting the length of the padding dedicated to levelname part in a record
 
 
-def enable_logging(terminal_level="INFO", file_level="LOAD", programname="", username=""):
+def enable_logging(terminal_level="NOTE", file_level="LOAD", programname="", username=""):
+    """_summary_
+
+    Args:
+        terminal_level (str, optional): _description_. Defaults to "INFO".
+        file_level (str, optional): _description_. Defaults to "LOAD".
+        programname (str, optional): _description_. Defaults to "".
+        username (str, optional): _description_. Defaults to "".
+    """
     # Create a filehandler object for file
-    fh = logging.FileHandler("test.log")
+    fh = logging.FileHandler("test.log", "w", "utf-8")
     f_formater = FileFormatter()
     fh.setFormatter(f_formater)
 
@@ -80,11 +88,23 @@ def enable_logging(terminal_level="INFO", file_level="LOAD", programname="", use
 
 
 class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
+    """_summary_"""
+
     # note that only message, name, levelname, pathname, process, thread, lineno, levelno and filename can be dynamic.
     # asctime of hostname for example, can't. This is limitation for implementation simplicity reasons only,
     # as it would be more complex to implement otherwise, and for a small benefit.
 
     def __init__(self, fmt=None, datefmt=None, style="%", level_styles=None, field_styles=None, dynamic_levels=None):
+        """_summary_
+
+        Args:
+            fmt (_type_, optional): _description_. Defaults to None.
+            datefmt (_type_, optional): _description_. Defaults to None.
+            style (str, optional): _description_. Defaults to "%".
+            level_styles (_type_, optional): _description_. Defaults to None.
+            field_styles (_type_, optional): _description_. Defaults to None.
+            dynamic_levels (_type_, optional): _description_. Defaults to None.
+        """
         self.dynamic_levels = dynamic_levels
         self.lenght_pre_formaters = self.get_length_pre_formaters(fmt)
         super().__init__(
@@ -96,6 +116,14 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         )
 
     def get_length_pre_formaters(self, fmt):
+        """_summary_
+
+        Args:
+            fmt (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
         padding_dict = {name: int(padding) if padding else 0 for name, padding in result}
@@ -103,6 +131,14 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         return padding_dict
 
     def format(self, record):
+        """_summary_
+
+        Args:
+            record (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         style = self.nn.get(self.level_styles, record.levelname)
         # print(repr(humanfriendly.terminal.ansi_style(**style)))
         record.message = record.getMessage()
@@ -153,10 +189,11 @@ class SugarColoredFormatter(DynamicColoredFormatter):
         "start": {"color": 195, "background": 57, "bold": True},
         "end": {"color": 195, "background": 57, "bold": True},
         "header": {"color": 27, "underline": True, "bold": True},
+        "info": {"color": 27},
+        "note": {"color": 8},
         "load": {"color": 141, "italic": True},
         "save": {"color": 141, "italic": True},
-        "info": {"color": 27},
-        "debug": {"color": 8, "faint": True},
+        "debug": {"color": 251, "faint": True},
     }
     FIELD_STYLES = {
         "asctime": {"color": "green"},
@@ -246,45 +283,124 @@ class LogTask:
 
 
 class ContextFilter(logging.Filter):
-    """
-    This is a filter which injects contextual information into the log.
-    """
+    """This is a filter which injects contextual information into the log."""
 
     def __init__(self, context_msg):
+        """Initialization method.
+
+        Args:
+            context_msg (str): Context to inject into the log
+        """
         self.context_msg = context_msg
 
     def filter(self, record):
+        """Modify log record to include the context message.
+
+        Args:
+            record (logging.LogRecord): Log record.
+
+        Returns:
+            bool: Always True since the filter does not block any record
+        """
         record.msg = f"{self.context_msg} {record.msg}"
         return True
 
+    def __repr__(self):
+        """String representation of the ContextFilter.
+
+        Returns:
+            str: String representation of ContextFilter.
+        """
+        return f"<ContextFilter({self.context_msg})>"
+
 
 class LogContext:
+    """A context for managing logging with context_msg added to any logging entry inside it"""
+
     def __init__(self, context_msg):
+        """Initialization method.
+
+        Args:
+            context_msg (str): Context message to log.
+
+        Example :
+            ```python
+            logger = logging.getLogger("test_level")
+            with LogContext("my context"):
+                logger.info("a test message in a context")
+            logger.info("a test message out of a context")
+            ```
+
+            ```console
+            INFO     : test_level                    : <my context> a test message in a context
+            INFO     : test_level                    : a test message out of a context
+            ```
+        """
         self.context_msg = context_msg
-        self.filter_was_added = False
+        self.context_filters = {}
 
     def __enter__(self):
+        """Add context specific filter to a logging handler"""
         self.root_logger = logging.getLogger()
-        for filter in self.root_logger.filters:
-            if getattr(filter, "context_msg", "") == self.context_msg:
-                return
+        found = False
+        for handler in self.root_logger.handlers:
+            for filter in handler.filters:
+                if getattr(filter, "context_msg", "") == self.context_msg:
+                    self.root_logger.debug(f"Filter already added to handler {handler}")
+                    found = True
+                    break
 
-        self.filter_was_added = True
-        self.context_filter = ContextFilter(self.context_msg)
-        self.root_logger.addFilter(self.context_filter)
+        if found:
+            return
+
+        # else add it to any handler coming first
+        for handler in self.root_logger.handlers:
+            context_filter = ContextFilter(self.context_msg)
+            handler.addFilter(context_filter)
+            self.context_filters[handler] = context_filter
+            self.root_logger.debug(f"Added filter {context_filter} to handler {handler}")
+            break
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.filter_was_added:
-            self.root_logger.removeFilter(self.context_filter)
+        """Remove previously added context-specific filter from a logging handler.
+
+        Args:
+            exc_type (type): Type of the exception that caused the context management to be exited.
+            exc_val (Exception): Instance of the exception.
+            exc_tb (traceback): Traceback of the exception.
+        """
+        for handler in self.root_logger.handlers:
+            filer_to_remove = self.context_filters.get(handler, None)
+            if filer_to_remove is None:
+                continue
+            else:
+                self.root_logger.debug(f"Removing filter {filer_to_remove} from handler {handler} in this context")
+                handler.removeFilter(filer_to_remove)
 
 
 class LogSession(LogContext):
+    """Specialized version of LogContext for managing session logging."""
+
     def __init__(self, session):
-        context_msg = "s#" + str(session.alias)
+        """Initialization method.
+
+        Args:
+            session (dict): Session details.
+        """
+        context_msg = "<" + str(session["alias"]) + ">"
         super().__init__(context_msg)
 
 
 def loggedmethod(func):
+    """Decorator to perform logged method.
+
+    Args:
+        func (function): Function to be executed with logging.
+
+    Returns:
+        function: Decorated function.
+    """
+
     @wraps(func)
     def wrapper(session, *args, **kwargs):
         if kwargs.get("no_session_log", False):
@@ -296,6 +412,7 @@ def loggedmethod(func):
 
 
 def add_all_custom_headers():
+    addLoggingLevel("NOTE", logging.INFO - 1, if_exists="keep")
     addLoggingLevel("LOAD", logging.DEBUG + 1, if_exists="keep")
     addLoggingLevel("SAVE", logging.DEBUG + 2, if_exists="keep")
     addLoggingLevel("HEADER", logging.INFO + 1, if_exists="keep")

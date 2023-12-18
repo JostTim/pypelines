@@ -7,9 +7,7 @@ import pandas as pd
 
 
 class PickleDiskObject(BaseDiskObject):
-    collection = [
-        "preprocessing_saves"
-    ]  # collection a.k.a subfolders in the session.path
+    collection = ["preprocessing_saves"]  # collection a.k.a subfolders in the session.path
     extension = "pickle"
     current_suffixes = ""
     remove = True
@@ -54,14 +52,10 @@ class PickleDiskObject(BaseDiskObject):
         # we compare levels with the currently called step
         # if disk step level < current called step level, we return True, else we return False.
         if disk_step.get_level(selfish=True) < self.step.get_level(selfish=True):
-            logger.debug(
-                f"Disk step {disk_step.full_name} was lower than {self.step.full_name}. Returning True"
-            )
+            logger.debug(f"Disk step {disk_step.full_name} was lower than {self.step.full_name}. Returning True")
             return True
 
-        logger.debug(
-            f"Disk step {disk_step.full_name} was higher or equal than {self.step.full_name}. Returning False"
-        )
+        logger.debug(f"Disk step {disk_step.full_name} was higher or equal than {self.step.full_name}. Returning False")
         return False
 
     @property
@@ -91,15 +85,7 @@ class PickleDiskObject(BaseDiskObject):
 
         extra = self.parse_extra(self.extra, regexp=True)
 
-        pattern = (
-            self.file_prefix
-            + r"\."
-            + self.step.pipe_name
-            + step_pattern
-            + extra
-            + r"\."
-            + self.extension
-        )
+        pattern = self.file_prefix + r"\." + self.step.pipe_name + step_pattern + extra + r"\." + self.extension
         return pattern
 
     def get_file_name(self):
@@ -145,12 +131,11 @@ class PickleDiskObject(BaseDiskObject):
             match_data = {}
             for key in keys:
                 match_data[key] = match.group(key)
-                # TODO DEBUG: catch here with KeyError and return an error that is more explicit, if key is not present in the automatically generated re pattern (would be a BUG)
+                # TODO DEBUG: catch here with KeyError and return an error that is more explicit, if key is
+                # not present in the automatically generated re pattern (would be a BUG)
 
             if expected_values == match_data:
-                self.current_disk_file = os.path.join(
-                    search_path, matching_files[index]
-                )
+                self.current_disk_file = os.path.join(search_path, matching_files[index])
                 self.disk_version = match_data["version"]
                 self.disk_step = match_data["step_name"]
                 logger.debug(
@@ -160,8 +145,9 @@ class PickleDiskObject(BaseDiskObject):
             match_datas.append(match_data)
 
         if len(match_datas) == 1:
-            logger.warning(
-                f"A single partial match was found for {self.object_name}. Please make sure it is consistant with expected behaviour. Expected : {expected_values}, Found : {match_datas[0]}"
+            logger.load(
+                f"A single partial match was found for {self.object_name}. Please make sure it is consistant with"
+                f" expected behaviour. Expected : {expected_values}, Found : {match_datas[0]}"
             )
             self.current_disk_file = os.path.join(search_path, matching_files[0])
             self.disk_version = match_datas[0]["version"]
@@ -170,8 +156,9 @@ class PickleDiskObject(BaseDiskObject):
                 self.is_legacy_format = True
             return True
         else:
-            logger.warning(
-                f"More than one partial match was found for {self.step.full_name}. Cannot auto select. Expected : {expected_values}, Found : {match_datas}"
+            logger.load(
+                f"More than one partial match was found for {self.step.full_name}. Cannot auto select. Expected :"
+                f" {expected_values}, Found : {match_datas}"
             )
             return False
 
@@ -179,9 +166,7 @@ class PickleDiskObject(BaseDiskObject):
         return str(self.current_disk_file)
 
     def get_full_path(self):
-        full_path = os.path.join(
-            self.session.path, os.path.sep.join(self.collection), self.get_file_name()
-        )
+        full_path = os.path.join(self.session.path, os.path.sep.join(self.collection), self.get_file_name())
         return full_path
 
     def save(self, data):
@@ -194,18 +179,12 @@ class PickleDiskObject(BaseDiskObject):
         else:
             with open(new_full_path, "wb") as f:
                 pickle.dump(data, f)
-        if (
-            self.current_disk_file is not None
-            and self.current_disk_file != new_full_path
-            and self.remove
-        ):
+        if self.current_disk_file is not None and self.current_disk_file != new_full_path and self.remove:
             logger.debug(f"Removing old file from path : {self.current_disk_file}")
             try:
                 os.remove(self.current_disk_file)
             except FileNotFoundError:
-                logger.error(
-                    f"The file {self.current_disk_file} that should have been removed don't exist anymore"
-                )
+                logger.error(f"The file {self.current_disk_file} that should have been removed don't exist anymore")
         self.current_disk_file = new_full_path
 
     def load(self):
@@ -236,26 +215,17 @@ class PickleDiskObject(BaseDiskObject):
 
     @staticmethod
     def multisession_packer(sessions, session_result_dict: dict) -> pd.DataFrame | dict:
-        session_result_dict = BaseDiskObject.multisession_packer(
-            sessions, session_result_dict
-        )
+        session_result_dict = BaseDiskObject.multisession_packer(sessions, session_result_dict)
 
-        are_dataframe = [
-            isinstance(item, pd.core.frame.DataFrame)
-            for item in session_result_dict.values()
-        ]
+        are_dataframe = [isinstance(item, pd.core.frame.DataFrame) for item in session_result_dict.values()]
 
         if not all(are_dataframe):
             return session_result_dict
 
-        return PickleDiskObject.get_multi_session_df(
-            session_result_dict, add_session_level=False
-        )
+        return PickleDiskObject.get_multi_session_df(session_result_dict, add_session_level=False)
 
     @staticmethod
-    def get_multi_session_df(
-        multisession_data_dict: dict, add_session_level: bool = False
-    ) -> pd.DataFrame:
+    def get_multi_session_df(multisession_data_dict: dict, add_session_level: bool = False) -> pd.DataFrame:
         dataframes = []
         for session_name, dataframe in multisession_data_dict.items():
             level_names = list(dataframe.index.names)
@@ -264,9 +234,7 @@ class PickleDiskObject(BaseDiskObject):
 
             if add_session_level:
                 dataframe["session#"] = [session_name] * len(dataframe)
-                dataframe = dataframe.set_index(
-                    ["session#"] + level_names, inplace=False
-                )
+                dataframe = dataframe.set_index(["session#"] + level_names, inplace=False)
 
             else:
                 level_0_copy = dataframe[level_names[0]].copy()
@@ -284,9 +252,7 @@ class PickleDiskObject(BaseDiskObject):
         return multisession_dataframe
 
     @staticmethod
-    def merge_index_element(
-        values: tuple | str | float | int, session_name: str
-    ) -> tuple:
+    def merge_index_element(values: tuple | str | float | int, session_name: str) -> tuple:
         if not isinstance(values, tuple):
             values = (values,)
 
@@ -321,11 +287,13 @@ def files(
     Args:
         input_path (str): A valid path to a folder.
             This folder is used as the root to return files found
-            (possible condition selection by giving to re_callback a function taking a regexp pattern and a string as argument, an returning a boolean).
+            (possible condition selection by giving to re_callback a function taking a regexp pattern and a string as
+            argument, an returning a boolean).
     Returns:
         list: List of the file fullpaths found under ``input_path`` folder and subfolders.
     """
-    # if levels = -1, we get  everything whatever the depth (at least up to 32767 subfolders, but this should be fine...)
+    # if levels = -1, we get  everything whatever the depth
+    # (up to 32767 subfolders, so this should be fine...)
 
     if levels == -1:
         levels = 32767
@@ -337,9 +305,7 @@ def files(
         for subdir in os.listdir(_input_path):
             fullpath = os.path.join(_input_path, subdir)
             if os.path.isfile(fullpath):
-                if (get == "all" or get == "files") and (
-                    re_pattern is None or qregexp(re_pattern, fullpath)
-                ):
+                if (get == "all" or get == "files") and (re_pattern is None or qregexp(re_pattern, fullpath)):
                     output_list.append(os.path.normpath(fullpath))
 
             else:
@@ -353,9 +319,7 @@ def files(
         current_level -= 1
 
     if os.path.isfile(input_path):
-        raise ValueError(
-            f"Can only list files in a directory. A file was given : {input_path}"
-        )
+        raise ValueError(f"Can only list files in a directory. A file was given : {input_path}")
 
     if not os.path.isdir(input_path):
         # the given directory does not exist, we return an empty list to notify no file was found
