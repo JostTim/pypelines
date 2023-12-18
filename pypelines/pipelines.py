@@ -1,4 +1,5 @@
-from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+from typing import Callable, Type, Iterable, Protocol, 
+import os
 from .graphs import PipelineGraph
 
 if TYPE_CHECKING:
@@ -7,10 +8,14 @@ if TYPE_CHECKING:
 
 
 class Pipeline:
-    def __init__(self, name: str):
+    def __init__(self, name: str, path = None, use_celery = False):
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
+        self.path = os.path.basename(path) if path is not None else None
+
+        if use_celery :
+            self.configure_celery()
 
     def register_pipe(self, pipe_class: BasePipe) -> BasePipe:
         """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
@@ -60,7 +65,7 @@ class Pipeline:
                 step.requires = instanciated_requires
 
         self.resolved = True
-    
+
     def get_requirement_stack(self, instance: BaseStep, names: bool = False, max_recursion: int = 100):
         self.resolve()
         parents = []
@@ -105,3 +110,13 @@ class Pipeline:
     @property
     def graph(self):
         return PipelineGraph(self)
+    
+    def configure_celery(self):
+        from dynaconf import Dynaconf
+        self.setting_file = os.path.join( self.path , f"celery_{self.name}.toml" )
+        self.secrets_file = os.path.join( self.path , f".celery_{self.name}_secrets.toml" )
+        self.celery_settings = Dynaconf(settings_files=[self.setting_file, self.secrets_file])
+
+    def celery(self):
+        
+
