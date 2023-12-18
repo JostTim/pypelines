@@ -1,5 +1,5 @@
 from functools import wraps, partial, update_wrapper
-from .loggs import loggedmethod
+from .loggs import loggedmethod, NAMELENGTH
 from .arguments import autoload_arguments
 import logging, inspect
 
@@ -190,8 +190,6 @@ class BaseStep:
                 (file exists and refresh is False), this has no effect. If True, we save the file after calculation.
             """
 
-            logger = logging.getLogger(f"gen.{self.full_name}")
-
             if extra is None:
                 extra = self.get_default_extra()
 
@@ -200,6 +198,11 @@ class BaseStep:
             in_requirement = kwargs.pop(
                 "in_requirement", False
             )  # a flag to know if we are in requirement run or toplevel
+
+            if in_requirement:
+                logger = logging.getLogger(f"╰─>req.{self.full_name}"[:NAMELENGTH])
+            else:
+                logger = logging.getLogger(f"gen.{self.full_name}"[:NAMELENGTH])
 
             if refresh and skip:
                 raise ValueError(
@@ -317,7 +320,7 @@ class BaseStep:
                 return None
 
             if in_requirement:
-                logger.header(f"╰─> Performing the requirement {self.full_name}{'.' + extra if extra else ''}")
+                logger.header(f"Performing the requirement {self.full_name}{'.' + extra if extra else ''}")
             else:
                 logger.header(f"Performing the computation to generate {self.full_name}{'.' + extra if extra else ''}")
             kwargs.update({"extra": extra})
