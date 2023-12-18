@@ -1,5 +1,5 @@
 from functools import wraps, partial, update_wrapper
-from .loggs import loggedmethod
+from .loggs import loggedmethod, NAMELENGTH
 from .arguments import autoload_arguments
 import logging, inspect
 
@@ -190,12 +190,19 @@ class BaseStep:
                 (file exists and refresh is False), this has no effect. If True, we save the file after calculation.
             """
 
-            logger = logging.getLogger(f"gen.{self.full_name}")
-
             if extra is None:
                 extra = self.get_default_extra()
 
             self.pipeline.resolve()
+
+            in_requirement = kwargs.pop(
+                "in_requirement", False
+            )  # a flag to know if we are in requirement run or toplevel
+
+            if in_requirement:
+                logger = logging.getLogger(f"╰─>req.{self.full_name}"[:NAMELENGTH])
+            else:
+                logger = logging.getLogger(f"gen.{self.full_name}"[:NAMELENGTH])
 
             if refresh and skip:
                 raise ValueError(
@@ -219,20 +226,20 @@ class BaseStep:
             if not refresh:
                 if disk_object.is_loadable():
                     if disk_object.step_level_too_low():
-                        logger.info(
+                        logger.load(
                             "File(s) have been found but with a step too low in the requirement stack. Reloading the"
                             " generation tree"
                         )
                         check_requirements = True
 
                     elif disk_object.version_deprecated():
-                        logger.info(
+                        logger.load(
                             "File(s) have been found but with an old version identifier. Reloading the generation tree"
                         )
                         check_requirements = True
 
                     elif skip:
-                        logger.info(
+                        logger.load(
                             f"File exists for {self.full_name}{'.' + extra if extra else ''}. Loading and processing"
                             " will be skipped"
                         )
@@ -251,7 +258,7 @@ class BaseStep:
 
                     # if not step_level_too_low, nor version_deprecated, nor skip, we load the is_loadable disk object
                     else:
-                        logger.info("Found data. Trying to load it")
+                        logger.load("Found data. Trying to load it")
 
                         try:
                             result = disk_object.load()
@@ -262,20 +269,19 @@ class BaseStep:
                                 " and load implementation. Check the original error above."
                             ) from e
 
-                        logger.info(f"Loaded {self.full_name}{'.' + extra if extra else ''} sucessfully.")
+                        logger.load(f"Loaded {self.full_name}{'.' + extra if extra else ''} sucessfully.")
                         return result
                 else:
-                    logger.info(f"Could not find or load {self.full_name}{'.' + extra if extra else ''} saved file.")
+                    logger.load(f"Could not find or load {self.full_name}{'.' + extra if extra else ''} saved file.")
             else:
-                logger.info("`refresh` was set to True, ignoring the state of disk files and running the function.")
+                logger.load("`refresh` was set to True, ignoring the state of disk files and running the function.")
 
             if check_requirements:
                 # if refresh_requirements:
                 # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
                 # forcing generation with refresh true on all the steps along the way.
-
+                logger.info("Checking the requirements")
                 for step in self.requirement_stack():
-                    logger.info(f"Running requirement {step.full_name}")
                     if self.pipe.pipe_name == step.pipe.pipe_name:
                         _extra = extra
                     else:
@@ -307,21 +313,23 @@ class BaseStep:
                         refresh=_refresh,
                         extra=_extra,
                         skip=_skip,
+                        in_requirement=True,
                     )
 
             if skip_after_tree:
                 return None
 
-            logger.info(
-                f"Performing the computation to generate {self.full_name}{'.' + extra if extra else ''}. Hold tight."
-            )
+            if in_requirement:
+                logger.header(f"Performing the requirement {self.full_name}{'.' + extra if extra else ''}")
+            else:
+                logger.header(f"Performing the computation to generate {self.full_name}{'.' + extra if extra else ''}")
             kwargs.update({"extra": extra})
             if self.is_refresh_in_kwargs():
                 kwargs.update({"refresh": refresh})
             result = self.pipe.pre_run_wrapper(self.worker(session, *args, **kwargs))
 
             if save_output:
-                logger.info(f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output.")
+                logger.save(f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output.")
                 disk_object.save(result)
 
                 # AFTER the saving has been done, if there is some callback function that should be run, we execute them
@@ -333,7 +341,12 @@ class BaseStep:
                     try:
                         callback(session=session, extra=extra, pipeline=self.pipeline)
                     except Exception as e:
+                        import traceback
+
+                        traceback_msg = traceback.format_exc()
                         logger.error(f"The callback {callback} failed with error : {e}")
+                        logger.error("Full traceback below :\n" + traceback_msg)
+
             return result
 
         original_signature = inspect.signature(self.worker)

@@ -51,7 +51,7 @@ def autoload_arguments(wrapped_function, step):
 
         config_kwargs = get_step_arguments(session, step)
         if config_kwargs:  # new_kwargs is not empty
-            local_log.info(f"Using the arguments for the function {step.full_name} found in pipelines_arguments.json.")
+            local_log.note(f"Using the arguments for the function {step.full_name} found in pipelines_arguments.json.")
         # this loop is just to show to log wich arguments have been overriden
         # from the json config by some arguments in the code
         overrides_names = []
@@ -60,9 +60,9 @@ def autoload_arguments(wrapped_function, step):
                 overrides_names.append(key)
 
         if overrides_names:
-            local_log.info(
+            local_log.note(
                 f"Values of pipelines_arguments.json arguments : {', '.join(overrides_names)}, are overrided by the"
-                " current call arguments."
+                f" current call arguments to {step.full_name}"
             )
 
         config_kwargs.update(kwargs)
