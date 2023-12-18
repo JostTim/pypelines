@@ -3,15 +3,16 @@ from .graphs import PipelineGraph
 
 if TYPE_CHECKING:
     from .pipes import BasePipe
+    from .steps import BaseStep
 
 
 class Pipeline:
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
 
-    def register_pipe(self, pipe_class: type) -> type:
+    def register_pipe(self, pipe_class: BasePipe) -> BasePipe:
         """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
         The Wraper returns the class without changing it."""
         instance = pipe_class(self)
@@ -59,8 +60,8 @@ class Pipeline:
                 step.requires = instanciated_requires
 
         self.resolved = True
-
-    def get_requirement_stack(self, instance, names=False, max_recursion=100):
+    
+    def get_requirement_stack(self, instance: BaseStep, names: bool = False, max_recursion: int = 100):
         self.resolve()
         parents = []
         required_steps = []
