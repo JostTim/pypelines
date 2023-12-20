@@ -405,6 +405,9 @@ class BaseStep:
             ) from e
         return req_step.load(session, extra=extra)
 
+    def set_arguments(self, session, **arguments):
+        ...
+
 
 @dataclass
 class StepLevel:
