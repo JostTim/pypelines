@@ -47,8 +47,8 @@ class Pipeline:
             if pipe.single_step:
                 return pipe
             return pipe.steps[step_name]
-        except KeyError:
-            raise KeyError(f"No instance {instance_name} has been registered to the pipeline")
+        except KeyError as exc:
+            raise KeyError(f"No instance {instance_name} has been registered to the pipeline") from exc
 
     def resolve(self):
         if self.resolved:
@@ -114,8 +114,8 @@ class Pipeline:
     def configure_celery(self):
         from dynaconf import Dynaconf
 
-        self.setting_file = os.path.join(self.path, f"celery_{self.name}.toml")
-        self.secrets_file = os.path.join(self.path, f".celery_{self.name}_secrets.toml")
+        self.setting_file = os.path.join(self.path, f"celery_{self.pipeline_name}.toml")
+        self.secrets_file = os.path.join(self.path, f".celery_{self.pipeline_name}_secrets.toml")
         self.celery_settings = Dynaconf(settings_files=[self.setting_file, self.secrets_file])
 
     def celery(self):
