@@ -408,6 +408,9 @@ class BaseStep:
     def set_arguments(self, session, **arguments):
         ...
 
+    def get_arguments(self, session):
+        ...
+
 
 @dataclass
 class StepLevel:

@@ -66,6 +66,10 @@ class BasePipe(metaclass=ABCMeta):
             # so that we attach the necessary components to it.
             setattr(self, step_name, step)
 
+            # if the pipeline has been created with celery settings, we attach the step generation to celery.
+            if self.pipeline.use_celery:
+                self.pipeline.celery.register_step(step)
+
         # below is just a syntaxic sugar to help in case the pipe is "single_step"
         # so that we can access any pipe instance in pipeline with simple iteration on
         # pipeline.pipes.pipe, whatever if the object in pipelines.pipes is a step or a pipe

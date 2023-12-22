@@ -1,4 +1,5 @@
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+
 import os
 from .graphs import PipelineGraph
 
@@ -8,11 +9,13 @@ if TYPE_CHECKING:
 
 
 class Pipeline:
-    def __init__(self, name: str, path=None, use_celery=False):
+    use_celery = False
+
+    def __init__(self, name: str, conf_path=None, use_celery=False):
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
-        self.path = os.path.basename(path) if path is not None else None
+        self.conf_path = os.path.basename(conf_path) if conf_path is not None else None
 
         if use_celery:
             self.configure_celery()
@@ -40,7 +43,7 @@ class Pipeline:
         self.resolved = False
         return pipe_class
 
-    def resolve_instance(self, instance_name: str):
+    def resolve_instance(self, instance_name: str) -> "BaseStep":
         pipe_name, step_name = instance_name.split(".")
         try:
             pipe = self.pipes[pipe_name]
@@ -50,7 +53,13 @@ class Pipeline:
         except KeyError:
             raise KeyError(f"No instance {instance_name} has been registered to the pipeline")
 
-    def resolve(self):
+    def resolve(self) -> None:
+        """Scans currentely registered Pipes.
+        Ensures that for each Pipe's Step, the items in requires list are Step instances, and not strings.
+        If they aren't instanciate them.
+        Once ran, sets a flag resolved to True, to avoid needing to reprocess the class's Pipes.
+        This flag is set to False inside register_pipe function, if a new class gets registered.
+        """
         if self.resolved:
             return
 
@@ -66,20 +75,39 @@ class Pipeline:
 
         self.resolved = True
 
-    def get_requirement_stack(self, instance: "BaseStep", names: bool = False, max_recursion: int = 100):
-        self.resolve()
+    def get_requirement_stack(self, instance: "BaseStep", names: bool = False, max_recursion: int = 100) -> list:
+        """Returns a list containing the ordered Steps that the "instance" Step object requires for being ran.
+
+        Args:
+            instance (BaseStep): _description_
+            names (bool, optional): _description_. Defaults to False.
+            max_recursion (int, optional): _description_. Defaults to 100.
+
+        Raises:
+            RecursionError: _description_
+            ValueError: _description_
+
+        Returns:
+            list: _description_
+        """
+
+        self.resolve()  # ensure requires lists are containing instances and not strings
         parents = []
         required_steps = []
 
         def recurse_requirement_stack(
             instance,
-        ):  # , required_steps = None, parents = None):
-            # if required_steps is None :
-            #     required_steps = []
+        ):
+            """
+            _summary_
 
-            # if parents is None:
-            #     parents = []
+            Args:
+                instance (BaseStep): _description_
 
+            Raises:
+                RecursionError: _description_
+                ValueError: _description_
+            """
             if instance in parents:
                 raise RecursionError(
                     f"Circular import : {parents[-1]} requires {instance} wich exists in parents hierarchy : {parents}"
@@ -93,14 +121,11 @@ class Pipeline:
                 )
 
             for requirement in instance.requires:
-                # required_steps =
-                recurse_requirement_stack(requirement)  # , required_steps, parents, max_recursion)
+                recurse_requirement_stack(requirement)
                 if requirement not in required_steps:
                     required_steps.append(requirement)
 
             parents.pop(-1)
-
-            # return required_steps
 
         recurse_requirement_stack(instance)
         if names:
@@ -108,15 +133,15 @@ class Pipeline:
         return required_steps
 
     @property
-    def graph(self):
+    def graph(self) -> PipelineGraph:
         return PipelineGraph(self)
 
-    def configure_celery(self):
-        from dynaconf import Dynaconf
+    def configure_celery(self) -> None:
+        from .tasks import CeleryHandler
 
-        self.setting_file = os.path.join(self.path, f"celery_{self.name}.toml")
-        self.secrets_file = os.path.join(self.path, f".celery_{self.name}_secrets.toml")
-        self.celery_settings = Dynaconf(settings_files=[self.setting_file, self.secrets_file])
+        self.celery = CeleryHandler(self.conf_path, self.pipeline_name)
+        self.use_celery = True
 
-    def celery(self):
-        pass
+    def finalize(self):
+        if self.use_celery:
+            self.celery.app.start()

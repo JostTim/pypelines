@@ -235,25 +235,26 @@ class FileFormatter(SugarColoredFormatter):
 
 
 class LogTask:
-    def __init__(self, session, worker_pk, task_name, username="", level="LOAD"):
-        self.path = os.path.normpath(os.path.join(session.path, "logs"))
+    def __init__(self, task_record, username="", level="LOAD"):
+        self.path = os.path.normpath(task_record.session_path)
         self.username = username
         os.makedirs(self.path, exist_ok=True)
-        self.worker_pk = worker_pk
-        self.task_name = task_name
+        self.worker_pk = task_record.id
+        self.task_name = task_record.name
         self.level = getattr(logging, level.upper())
 
     def __enter__(self):
         self.logger = logging.getLogger()
         self.set_handler()
-        return self.logger
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.remove_handler()
 
     def set_handler(self):
-        filename = f"task_log.{self.task_name}.{self.worker_pk}.log"
-        fh = logging.FileHandler(os.path.join(self.path, filename))
+        self.filename = os.path.join("logs", f"task_log.{self.task_name}.{self.worker_pk}.log")
+        self.fullpath = os.path.join(self.path, self.filename)
+        fh = logging.FileHandler(self.fullpath)
         f_formater = FileFormatter()
         coloredlogs.HostNameFilter.install(
             fmt=f_formater.FORMAT,
