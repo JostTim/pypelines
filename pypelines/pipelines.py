@@ -50,8 +50,8 @@ class Pipeline:
             if pipe.single_step:
                 return pipe
             return pipe.steps[step_name]
-        except KeyError:
-            raise KeyError(f"No instance {instance_name} has been registered to the pipeline")
+        except KeyError as exc:
+            raise KeyError(f"No instance {instance_name} has been registered to the pipeline") from exc
 
     def resolve(self) -> None:
         """Scans currentely registered Pipes.
