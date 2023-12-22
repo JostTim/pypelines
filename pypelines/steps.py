@@ -421,7 +421,7 @@ class BaseStep:
         connector = ONE(mode="remote", data_access_mode="remote")
 
         worker = self.pipeline.celery.app.tasks[self.full_name]
-        task = connector.alyx.rest(
+        task_dict = connector.alyx.rest(
             "tasks",
             "create",
             data={
@@ -433,8 +433,18 @@ class BaseStep:
             },
         )
 
-        worker(task["id"], extra=extra)
-        return task
+        response_handle = worker.delay(task_dict["id"], extra=extra)
+        # launch the task on the server, and waits until available.
+        return RemoteTask(task_dict, response_handle)
+
+
+class RemoteTask:
+    infos = None
+    response = None
+
+    def __init__(self, task_infos_dict, response_handle):
+        self.infos = task_infos_dict
+        self.response = response_handle
 
 
 @dataclass

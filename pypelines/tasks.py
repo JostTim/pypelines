@@ -52,11 +52,11 @@ class CeleryHandler:
             try:
                 session = connector.search(id=task.session, details=True)
 
-                with LogTask(self, task) as log_object:
+                with LogTask(task) as log_object:
                     logger = log_object.logger
                     task.log = log_object.filename
                     task.status = "Started"
-                    connector.alyx.rest("tasks", "partial_update", **task.export())
+                    task = TaskRecord(connector.alyx.rest("tasks", "partial_update", **task.export()))
 
                     try:
                         step.generate(session, extra=extra, skip=True, check_requirements=True, **kwargs)
