@@ -411,6 +411,31 @@ class BaseStep:
     def get_arguments(self, session):
         ...
 
+    def start_remotely(self, session, extra=None, **kwargs):
+        if not self.pipeline.use_celery:
+            raise NotImplementedError(
+                "Cannot use this feature with a pipeline that doesn't have a celery cluster access"
+            )
+        from one import ONE
+
+        connector = ONE(mode="remote", data_access_mode="remote")
+
+        worker = self.pipeline.celery.app.tasks[self.full_name]
+        task = connector.alyx.rest(
+            "tasks",
+            "create",
+            data={
+                "session": session.name,
+                "name": self.full_name,
+                "arguments": kwargs,
+                "status": "Waiting",
+                "executable": self.pipeline.celery.app_name,
+            },
+        )
+
+        worker(task["id"], extra=extra)
+        return task
+
 
 @dataclass
 class StepLevel:

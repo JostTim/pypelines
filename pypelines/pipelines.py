@@ -15,7 +15,7 @@ class Pipeline:
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
-        self.conf_path = os.path.basename(conf_path) if conf_path is not None else None
+        self.conf_path = os.path.dirname(conf_path) if conf_path is not None else None
 
         if use_celery:
             self.configure_celery()

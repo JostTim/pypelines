@@ -17,7 +17,6 @@ class CeleryHandler:
         settings_files = self.get_setting_files_path(conf_path, pipeline_name)
         self.settings = Dynaconf(settings_files=settings_files)
         self.app_name = self.settings.get("app_name", pipeline_name)
-        print(self.settings)
         self.app = Celery(
             self.app_name,
             broker=(
@@ -93,35 +92,6 @@ class CeleryHandler:
             return "Warnings"
         else:
             return "Complete"
-
-    def start_step_remotely(self, step, session, extra=None, **kwargs):
-        if isinstance(step, str):
-            worker = self.app.tasks[step]  # step is a step name
-            name = step
-        else:
-            worker = self.app.tasks[step.full_name]
-            name = step.full_name
-
-        from one import ONE
-
-        connector = ONE(mode="remote", data_access_mode="remote")
-
-        task = TaskRecord(
-            connector.alyx.rest(
-                "tasks",
-                "create",
-                data={
-                    "session": session.name,
-                    "name": name,
-                    "arguments": kwargs,
-                    "status": "Waiting",
-                    "executable": self.app_name,
-                },
-            )
-        )
-
-        worker(task.id, extra=extra)
-        return task
 
 
 class TaskRecord(dict):
