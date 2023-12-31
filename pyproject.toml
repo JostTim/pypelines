@@ -15,7 +15,7 @@ description = "Framework to organize processing code outputs to/from disk, proce
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dynamic = ["version", "dependencies"]
+dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
 homepage = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
