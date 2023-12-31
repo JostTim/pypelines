@@ -26,7 +26,3 @@ documentation = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 dependencies = { file = ["requirements.txt"] }
 optional-dependencies = { celery = { file = ["requirements-celery.txt"] } }
 version = { attr = "pypelines.__version__" }
-
-[tool.setuptools]
-packages = ["pypelines"]
-package-dir = { "pypelines" = "src" }
