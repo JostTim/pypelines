@@ -3,8 +3,12 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
+
 name = "pypelines"
 authors = [
+    { name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr" },
+]
+maintainers = [
     { name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr" },
 ]
 description = "Framework to organize processing code outputs to/from disk, processing chaining and versionning with a common easy to use api"
@@ -13,7 +17,16 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 dynamic = ["version", "dependencies"]
 
+[project.urls]
+homepage = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
+repository = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
+documentation = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
+
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
 optional-dependencies = { celery = { file = ["requirements-celery.txt"] } }
-version = { attr = "package.__version__" }
+version = { attr = "pypelines.__version__" }
+
+[tool.setuptools]
+packages = ["pypelines"]
+package-dir = { "pypelines" = "src" }
