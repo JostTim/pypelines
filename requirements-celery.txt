@@ -1,2 +1,2 @@
 celery>=5.3.5
-git+https://gitlab.pasteur.fr/haisslab/data-management/pypelines.git
+ONE-api @ https://gitlab.pasteur.fr/haisslab/data-management/ONE.git
