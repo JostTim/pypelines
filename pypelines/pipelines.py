@@ -1,11 +1,11 @@
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
 
 import os
-from .graphs import PipelineGraph
 
 if TYPE_CHECKING:
     from .pipes import BasePipe
     from .steps import BaseStep
+    from .graphs import PipelineGraph
 
 
 class Pipeline:
@@ -133,7 +133,9 @@ class Pipeline:
         return required_steps
 
     @property
-    def graph(self) -> PipelineGraph:
+    def graph(self) -> "PipelineGraph":
+        from .graphs import PipelineGraph
+
         return PipelineGraph(self)
 
     def configure_celery(self) -> None:

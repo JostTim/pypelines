@@ -5,10 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pypelines"
 authors = [
-    {name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr"},
+    { name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr" },
 ]
 description = "Framework to organize processing code outputs to/from disk, processing chaining and versionning with a common easy to use api"
 readme = "README.md"
 requires-python = ">=3.10"
-license= { text = "MIT" }
+license = { text = "MIT" }
+dynamic = ["version", "dependencies"]
 
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies = { celery = { file = ["requirements-celery.txt"] } }
+version = { attr = "package.__version__" }
