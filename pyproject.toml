@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools >= 66.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -24,5 +24,8 @@ documentation = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
-optional-dependencies = { celery = { file = ["requirements-celery.txt"] } }
+optional-dependencies = { celery = { file = [
+    "requirements.txt",
+    "requirements-celery.txt",
+] } }
 version = { attr = "pypelines.__version__" }
