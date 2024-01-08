@@ -1,20 +1,10 @@
 image: python:3.11
 
-# stages:
-#   - documentation
-#   - publish
-#   - test
-
-# workflow:
-#   rules:
-#     - if: $CI_COMMIT_BRANCH == "main"
-
 documentation:
-  # stage: documentation
   script:
     - python -m pip install --upgrade pip
     - pip install auto_fast_docs
-    - auto_fast_docs ${CI_PROJECT_NAME} --username ${GITLAB_USER_NAME} --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
+    - auto_fast_docs ${CI_PROJECT_NAME} --username '${GITLAB_USER_NAME}' --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
   artifacts:
     paths:
       - ${CI_PROJECT_DIR}/public
@@ -22,7 +12,6 @@ documentation:
     - if: $CI_COMMIT_BRANCH == "main"
 
 publish:
-  # stage : publish
   variables:
     TWINE_PASSWORD: ${PIPY_TOKEN}
     TWINE_USERNAME: __token__
