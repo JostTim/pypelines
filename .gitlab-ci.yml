@@ -1,34 +1,34 @@
 image: python:3.11
 
-stages:
-  - documentation
-  - publish
-  - test
+# stages:
+#   - documentation
+#   - publish
+#   - test
 
-workflow:
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+# workflow:
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main"
 
 StaticDocPages:
-  stage: documentation
+  # stage: documentation
   script:
     - python -m pip install --upgrade pip
     - pip install auto_fast_docs
-    - auto_fast_docs ${CI_PROJECT_NAME} --username ${CI_COMMIT_AUTHOR} --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
+    - auto_fast_docs ${CI_PROJECT_NAME} --username ${GITLAB_USER_NAME} --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
   artifacts:
     paths:
-      - $CI_PROJECT_DIR/public
+      - ${CI_PROJECT_DIR}/public
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: ${CI_COMMIT_BRANCH} == "main"
 
 publish:
-  stage : publish
+  # stage : publish
   variables:
-    TWINE_PASSWORD: $PIPY_TOKEN
+    TWINE_PASSWORD: ${PIPY_TOKEN}
     TWINE_USERNAME: __token__
   script:
     - pip install build twine
     - python -m build
     - python -m twine upload --repository pipy dist/*
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: ${CI_COMMIT_BRANCH} == "main"
