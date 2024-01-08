@@ -19,7 +19,7 @@ documentation:
     paths:
       - ${CI_PROJECT_DIR}/public
   rules:
-    - if: '${CI_COMMIT_BRANCH} == "main"'
+    - if: $CI_COMMIT_BRANCH == "main"
 
 publish:
   # stage : publish
@@ -31,4 +31,4 @@ publish:
     - python -m build
     - python -m twine upload --repository pypi dist/*
   rules:
-    - if: '${CI_COMMIT_BRANCH} == "main"'
+    - if: $CI_COMMIT_BRANCH == "main"
