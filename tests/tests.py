@@ -1,6 +1,11 @@
-import unittest, sys, os
+import unittest
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+# for testing on local version, instead of installed version,
+# this may not be desired as testing uninstalled may not catch issues that occur after installation is performed
+# comment the next three lines to test installed version
+# import sys
+# from pathlib import Path
+# sys.path.append(str(Path(__file__).resolve().parent / "src"))
 
 from pypelines import examples
 from pypelines.sessions import Session
