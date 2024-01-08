@@ -14,7 +14,7 @@ StaticDocPages:
   script:
     - python -m pip install --upgrade pip
     - pip install auto_fast_docs
-    - auto_fast_docs Inflow --username --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
+    - auto_fast_docs ${CI_PROJECT_NAME} --username ${CI_COMMIT_AUTHOR} --platform 'gitlab:pasteur.fr' --group haisslab/data-management --layout src
   artifacts:
     paths:
       - $CI_PROJECT_DIR/public
@@ -24,7 +24,7 @@ StaticDocPages:
 publish:
   stage : publish
   variables:
-    TWINE_PASSWORD: ${PIPY_TOKEN}
+    TWINE_PASSWORD: $PIPY_TOKEN
     TWINE_USERNAME: __token__
   script:
     - pip install build twine
