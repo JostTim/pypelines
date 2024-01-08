@@ -9,7 +9,7 @@ image: python:3.11
 #   rules:
 #     - if: $CI_COMMIT_BRANCH == "main"
 
-StaticDocPages:
+documentation:
   # stage: documentation
   script:
     - python -m pip install --upgrade pip
@@ -19,7 +19,7 @@ StaticDocPages:
     paths:
       - ${CI_PROJECT_DIR}/public
   rules:
-    - if: ${CI_COMMIT_BRANCH} == "main"
+    - if: '${CI_COMMIT_BRANCH} == "main"'
 
 publish:
   # stage : publish
@@ -29,6 +29,6 @@ publish:
   script:
     - pip install build twine
     - python -m build
-    - python -m twine upload --repository pipy dist/*
+    - python -m twine upload --repository pypi dist/*
   rules:
-    - if: ${CI_COMMIT_BRANCH} == "main"
+    - if: '${CI_COMMIT_BRANCH} == "main"'
