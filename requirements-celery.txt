@@ -1,2 +1,2 @@
 celery>=5.3.5
-ONE-api @ git+https://gitlab.pasteur.fr/haisslab/data-management/ONE.git
+alyx_connector>=0.0.10

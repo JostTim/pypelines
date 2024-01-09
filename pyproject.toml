@@ -29,4 +29,5 @@ optional-dependencies = { celery = { file = [
 ] } }
 version = { attr = "pypelines.__version__" }
 
-[tool.black]
+[tool.setuptools.packages.find]
+where = ["src"]
