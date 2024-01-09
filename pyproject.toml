@@ -3,7 +3,7 @@ requires = ["setuptools >= 66.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pypelines"
+name = "processing-pypelines"
 authors = [
     { name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr" },
 ]
