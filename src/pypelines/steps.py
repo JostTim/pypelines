@@ -15,6 +15,28 @@ if TYPE_CHECKING:
 
 
 def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]):
+    """Wrapper to attach some attributes to a method of a pipeline's pipe. These methods are necessary to trigger the
+    pipeline creation mechanism on that step_method after the pipe has been fully defined.
+
+    Args:
+        requires (list, optional): single string or list of strings corresponding to other pipeline steps needed.
+            The other pipeline steps must belong to the same pipeline than the one of the step_method. Defaults to [].
+        version (_type_, optional): version of the step method. Changing this from none to a text or number will
+            result in previous saved outputs to be reprocessed upon generation check, so that you can more easily
+            control what needs to be reprocessed if you change an important computation step, and the minimum needed,
+            but no less, will be automatically reprocessed. Defaults to None.
+        do_dispatch (bool, optional): Wether to perform dispatch mechanism on calls of load, save and generate,
+            or not, for this step_method. Defaults to True.
+        on_save_callbacks (list, optional): The save callbacks can be a single callable, or a list of callables.
+            Additionnaly, independently if you supply a singloe of multiple callables,
+            they can be a tuple of (callable, named_argument_dict) instead of a simple callable.
+            The arguments in the dict will override arguments that would have been passed by the generation mechanism,
+            such as session, extra and pipeline. Defaults to [].
+
+    Returns:
+        callable : the callable with extra attributes attached
+    """
+
     # This  allows method  to register class methods inheriting of BasePipe as steps.
     # It basically just step an "is_step" stamp on the method that are defined as steps.
     # This stamp will later be used in the metaclass __new__ to set additionnal usefull attributes to those methods
@@ -337,9 +359,17 @@ class BaseStep:
                 # TODO an option could be added to catch, display and store exceptions tracebacks,
                 # while allowing the pipeline to continue,
                 # in case the callbacks are not absolutely necessary for the pipeline process. (ex, generate plots)
-                for callback in self.callbacks:
+                for callback_data in self.callbacks:
+                    arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
+                    if isinstance(callback_data, tuple):
+                        callback = callback_data[0]
+                        overriding_arguments = callback_data[1]
+                    else:
+                        callback = callback_data
+                        overriding_arguments = {}
+                    arguments.update(overriding_arguments)
                     try:
-                        callback(session=session, extra=extra, pipeline=self.pipeline)
+                        callback(**arguments)
                     except Exception as e:
                         import traceback
 
