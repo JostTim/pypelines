@@ -1,5 +1,7 @@
 from . import accessors
 import pandas as pd, os
+
+
 class Session(pd.Series):
     def __new__(
         cls,
@@ -10,9 +12,9 @@ class Session(pd.Series):
         number=None,
         path=None,
         auto_path=False,
-        date_format = None,
-        zfill = 3,
-        separator = "_"
+        date_format=None,
+        zfill=3,
+        separator="_",
     ):
         if series is None:
             series = pd.Series()
@@ -29,20 +31,23 @@ class Session(pd.Series):
         series.pipeline  # verify the series complies with pipeline acessor
 
         if auto_path:
-            series["path"] = os.path.normpath(os.path.join(
-                series["path"],
-                series.pipeline.subject(),
-                series.pipeline.date(date_format),
-                series.pipeline.number(zfill)
-            ))
+            series["path"] = os.path.normpath(
+                os.path.join(
+                    series["path"],
+                    series.pipeline.subject(),
+                    series.pipeline.date(date_format),
+                    series.pipeline.number(zfill),
+                )
+            )
 
         if series.name is None:
-            series.name = series.pipeline.alias(separator = separator, zfill = zfill , date_format = date_format)
+            series.name = series.pipeline.alias(separator=separator, zfill=zfill, date_format=date_format)
 
-        if not "alias" in series.index:
-            series["alias"] = series.pipeline.alias(separator = separator, zfill = zfill , date_format = date_format)
+        if "alias" not in series.index:
+            series["alias"] = series.pipeline.alias(separator=separator, zfill=zfill, date_format=date_format)
 
         return series
+
 
 class Sessions(pd.DataFrame):
     def __new__(cls, series_list):

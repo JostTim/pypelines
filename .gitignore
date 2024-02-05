@@ -5,3 +5,6 @@ tests/__pycache__*
 dist/*
 *.egg-info*
 *.pyc
+*.ipynb_checkpoints*
+notebooks/pipelines_tests/*
+notebooks/*.log
