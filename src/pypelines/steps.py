@@ -436,10 +436,10 @@ class BaseStep:
         return req_step.load(session, extra=extra)
 
     def set_arguments(self, session, **arguments):
-        ...
+        raise NotImplementedError
 
     def get_arguments(self, session):
-        ...
+        raise NotImplementedError
 
     def start_remotely(self, session, extra=None, **kwargs):
         if not self.pipeline.use_celery:
