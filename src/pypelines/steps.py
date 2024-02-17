@@ -53,6 +53,7 @@ def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]
 
 
 class BaseStep:
+
     def __init__(
         self,
         pipeline: "Pipeline",

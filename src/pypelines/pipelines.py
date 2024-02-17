@@ -1,4 +1,4 @@
-from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+from typing import Callable, Type, Dict, Iterable, Protocol, TYPE_CHECKING
 
 import os
 
@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 class Pipeline:
     use_celery = False
+    pipes: Dict[str, BasePipe]
 
     def __init__(self, name: str, conf_path=None, use_celery=False):
         self.pipeline_name = name
@@ -20,7 +21,7 @@ class Pipeline:
         if use_celery:
             self.configure_celery()
 
-    def register_pipe(self, pipe_class: "BasePipe") -> "BasePipe":
+    def register_pipe(self, pipe_class: Type["BasePipe"]) -> Type["BasePipe"]:
         """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
         The Wraper returns the class without changing it."""
         instance = pipe_class(self)
@@ -43,7 +44,7 @@ class Pipeline:
         self.resolved = False
         return pipe_class
 
-    def resolve_instance(self, instance_name: str) -> "BaseStep":
+    def resolve_instance(self, instance_name: str) -> Type["BaseStep"]:
         pipe_name, step_name = instance_name.split(".")
         try:
             pipe = self.pipes[pipe_name]
