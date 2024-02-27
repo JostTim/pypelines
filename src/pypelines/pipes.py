@@ -20,7 +20,7 @@ class BasePipe(metaclass=ABCMeta):
 
     default_extra = None
 
-    single_step: bool = False  # a flag to tell the initializer to bind the unique step of this pipe in place
+    # single_step: bool = False  # a flag to tell the initializer to bind the unique step of this pipe in place
     # of the pipe itself, to the registered pipeline.
     step_class: Type[BaseStep] = BaseStep
     disk_class: Type[BaseDiskObject] = BaseDiskObject
@@ -44,11 +44,11 @@ class BasePipe(metaclass=ABCMeta):
                 f" { _steps = }"
             )
 
-        if len(_steps) > 1 and self.single_step:
-            raise ValueError(
-                f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class."
-                f" { _steps = }"
-            )
+        # if len(_steps) > 1 and self.single_step:
+        #     raise ValueError(
+        #         f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class."
+        #         f" { _steps = }"
+        #     )
 
         number_of_steps_with_requirements = 0
         for step in _steps.values():

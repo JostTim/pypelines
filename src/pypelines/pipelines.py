@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class Pipeline:
     use_celery = False
-    pipes: Dict[str, BasePipe]
+    pipes: Dict[str, "BasePipe"]
 
     def __init__(self, name: str, conf_path=None, use_celery=False):
         self.pipeline_name = name
@@ -27,29 +27,29 @@ class Pipeline:
         instance = pipe_class(self)
 
         # attaches the instance itself to the pipeline, and to the dictionnary 'pipes' of the current pipeline
-        if instance.single_step:
-            # in case it's a single_step instance (speficied by the user, not auto detected)
-            # then we attach the step to the pipeline directly as a pipe, for ease of use.
-            step = list(instance.steps.values())[0]
-            self.pipes[instance.pipe_name] = step
-            # just add steps to the step instance serving as a pipe, so that it behaves
-            # similarly to a pipe for some pipelines function requiring this attribute to exist.
-            step.steps = instance.steps
-            setattr(self, instance.pipe_name, step)
-        else:
-            # in case it's a pipe, we attach it in a simple manner.
-            self.pipes[instance.pipe_name] = instance
-            setattr(self, instance.pipe_name, instance)
+        # if instance.single_step:
+        #     # in case it's a single_step instance (speficied by the user, not auto detected)
+        #     # then we attach the step to the pipeline directly as a pipe, for ease of use.
+        #     step = list(instance.steps.values())[0]
+        #     self.pipes[instance.pipe_name] = step
+        #     # just add steps to the step instance serving as a pipe, so that it behaves
+        #     # similarly to a pipe for some pipelines function requiring this attribute to exist.
+        #     step.steps = instance.steps
+        #     setattr(self, instance.pipe_name, step)
+        # else:
+        # in case it's a pipe, we attach it in a simple manner.
+        self.pipes[instance.pipe_name] = instance
+        setattr(self, instance.pipe_name, instance)
 
         self.resolved = False
         return pipe_class
 
-    def resolve_instance(self, instance_name: str) -> Type["BaseStep"]:
+    def resolve_instance(self, instance_name: str) -> "BaseStep":
         pipe_name, step_name = instance_name.split(".")
         try:
             pipe = self.pipes[pipe_name]
-            if pipe.single_step:
-                return pipe
+            # if pipe.single_step:
+            #    return pipe
             return pipe.steps[step_name]
         except KeyError as exc:
             raise KeyError(f"No instance {instance_name} has been registered to the pipeline") from exc

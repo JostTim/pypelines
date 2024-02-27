@@ -7,7 +7,7 @@ example_pipeline = Pipeline("example")
 
 @example_pipeline.register_pipe
 class treated_videos(PicklePipe):
-    single_step = True
+    # single_step = True
 
     @stepmethod()
     def compress(self, session, video_codec="ffmpeg", extra="", compression_rate=0.5):

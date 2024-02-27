@@ -97,9 +97,9 @@ class BaseStep:
     def full_name(self):
         return f"{self.pipe_name}.{self.step_name}"
 
-    @property
-    def single_step(self):
-        return self.pipe.single_step
+    # @property
+    # def single_step(self):
+    #     return self.pipe.single_step
 
     def disk_step(self, session, extra=""):
         disk_object = self.get_disk_object(session, extra)

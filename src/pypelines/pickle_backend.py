@@ -267,7 +267,7 @@ class PickleDiskObject(BaseDiskObject):
 
 
 class PicklePipe(BasePipe):
-    single_step = False
+    # single_step = False
     step_class = BaseStep
     disk_class = PickleDiskObject
 
