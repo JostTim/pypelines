@@ -12,24 +12,53 @@ class CeleryHandler:
     settings = None
     app = None
     app_name = None
+    success: bool = False
 
     def __init__(self, conf_path, pipeline_name):
+        logger = getLogger()
         settings_files = self.get_setting_files_path(conf_path, pipeline_name)
-        self.settings = Dynaconf(settings_files=settings_files)
-        self.app_name = self.settings.get("app_name", pipeline_name)
-        self.app = Celery(
-            self.app_name,
-            broker=(
-                f"{self.settings.connexion.broker_type}://"
-                f"{self.settings.account}:{self.settings.password}@{self.settings.address}//"
-            ),
-            backend=f"{self.settings.connexion.backend}://",
-        )
 
-        for key, value in self.settings.conf.items():
+        if any([not os.path.isfile(file) for file in settings_files]):
+            logger.warning(f"Some celery configuration files were missing for pipeline {pipeline_name}")
+            return
+
+        try:
+            self.settings = Dynaconf(settings_files=settings_files)
+
+            self.app_name = self.settings.get("app_name", pipeline_name)
+            broker_type = self.settings.connexion.broker_type
+            account = self.settings.account
+            password = self.settings.password
+            address = self.settings.address
+            backend = self.settings.connexion.backend
+            conf_data = self.settings.conf
+
+        except Exception as e:
+            logger.warning(
+                "Could not get all necessary information to configure celery when reading config files."
+                "Check their content."
+            )
+            return
+
+        try:
+            self.app = Celery(
+                self.app_name,
+                broker=(f"{broker_type}://" f"{account}:{password}@{address}//"),
+                backend=f"{backend}://",
+            )
+        except Exception as e:
+            logger.warning("Instanciating celery app failed. Maybe rabbitmq is not running ?")
+
+        for key, value in conf_data.items():
             setattr(self.app.conf, key, value)
 
-        self.connector = ONE(data_access_mode="remote")
+        try:
+            self.connector = ONE(data_access_mode="remote")
+        except Exception as e:
+            logger.warning("Instanciating One connector during celery configuration failed.")
+            return
+
+        self.success = True
 
     def get_setting_files_path(self, conf_path, pipeline_name):
         files = []

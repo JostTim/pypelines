@@ -1,5 +1,5 @@
 from typing import Callable, Type, Dict, Iterable, Protocol, TYPE_CHECKING
-
+from logging import getLogger
 import os
 
 if TYPE_CHECKING:
@@ -142,8 +142,16 @@ class Pipeline:
     def configure_celery(self) -> None:
         from .tasks import CeleryHandler
 
-        self.celery = CeleryHandler(self.conf_path, self.pipeline_name)
-        self.use_celery = True
+        celery = CeleryHandler(self.conf_path, self.pipeline_name)
+        if celery.success:
+            self.self.celery = celery
+            self.use_celery = True
+        else:
+            getLogger().warning(
+                f"Could not initialize celery for the pipeline {self.pipeline_name}."
+                "Don't worry, about this alert, "
+                "this is not be an issue if you didn't explicitely planned on using celery."
+            )
 
     def finalize(self):
         if self.use_celery:
