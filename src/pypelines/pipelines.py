@@ -144,7 +144,7 @@ class Pipeline:
 
         celery = CeleryHandler(self.conf_path, self.pipeline_name)
         if celery.success:
-            self.self.celery = celery
+            self.celery = celery
             self.use_celery = True
         else:
             getLogger().warning(
@@ -155,4 +155,4 @@ class Pipeline:
 
     def finalize(self):
         if self.use_celery:
-            self.celery.app.start()
+            self.celery.app.start()  # pyright: ignore
