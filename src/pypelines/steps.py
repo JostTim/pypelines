@@ -143,7 +143,7 @@ class BaseStep:
 
     def get_load_wrapped(self):
         @wraps(self.pipe.disk_class.load)
-        def wrapper(session, extra=None):
+        def wrapper(session, extra=None, strict=False):
             # print("extra in load wrapper : ", extra)
             if extra is None:
                 extra = self.get_default_extra()

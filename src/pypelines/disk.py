@@ -23,6 +23,10 @@ class BaseDiskObject(metaclass=ABCMeta):
     disk_version = None
     disk_step = None
 
+    step: "BaseStep"
+    session: Session
+    extra: str
+
     def __init__(self, session: Session, step: "BaseStep", extra="") -> None:
         # this object is meant to be short lived. Created, check drive,
         # and quickly take action by saving or loading file according to the procedures defined.
@@ -91,7 +95,7 @@ class BaseDiskObject(metaclass=ABCMeta):
         return None
 
     def is_matching(self):
-        if self.is_loadable() and not self.version_deprecated() and not self.step_level_too_low():
+        if self.is_loadable() and not (self.version_deprecated() or self.step_level_too_low()):
             return True
         return False
 

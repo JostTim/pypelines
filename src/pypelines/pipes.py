@@ -130,11 +130,16 @@ class BasePipe(metaclass=ABCMeta):
         return function
 
     def load(self, session, extra="", which: Literal["lowest", "highest"] = "highest"):
-        ordered_steps = sorted(list(self.steps.values()), key=lambda item: item.get_level(selfish=True))
-
         if which == "lowest":
-            step = ordered_steps[0]
+            reverse = False
         else:
-            step = ordered_steps[-1]
+            reverse = True
 
-        return step.load(session, extra)
+        ordered_steps = sorted(
+            list(self.steps.values()), key=lambda item: item.get_level(selfish=True), reverse=reverse
+        )
+
+        for step in ordered_steps:
+            if step.get_disk_object(session, extra).is_matching():
+                return step.load(session, extra)
+        raise ValueError(f"Could not find a {self} object to load for the session {session.alias} with extra {extra}")
