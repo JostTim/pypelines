@@ -140,7 +140,15 @@ class Pipeline:
         return PipelineGraph(self)
 
     def configure_celery(self) -> None:
-        from .tasks import CeleryHandler
+        try : 
+            from .tasks import CeleryHandler
+        except ImportError:
+            getLogger().warning(
+                f"Celery is not installed. Cannot set it up for the pipeline {self.pipeline_name}"
+                "Don't worry, about this alert, "
+                "this is not be an issue if you didn't explicitely planned on using celery."
+            )
+            return
 
         celery = CeleryHandler(self.conf_path, self.pipeline_name)
         if celery.success:
