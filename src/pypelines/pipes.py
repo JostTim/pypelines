@@ -40,8 +40,7 @@ class BasePipe(metaclass=ABCMeta):
 
         if len(_steps) < 1:
             raise ValueError(
-                f"You should register at least one step class with @stepmethod in {self.pipe_name} class."
-                f" { _steps = }"
+                f"You should register at least one step class with @stepmethod in {self.pipe_name} class. {_steps=}"
             )
 
         # if len(_steps) > 1 and self.single_step:
@@ -69,10 +68,6 @@ class BasePipe(metaclass=ABCMeta):
             self.steps[step_name] = step  # replace the bound_method by a step_class using that bound method,
             # so that we attach the necessary components to it.
             setattr(self, step_name, step)
-
-            # if the pipeline has been created with celery settings, we attach the step generation to celery.
-            if self.pipeline.use_celery:
-                self.pipeline.celery.register_step(step)
 
         # below is just a syntaxic sugar to help in case the pipe is "single_step"
         # so that we can access any pipe instance in pipeline with simple iteration on

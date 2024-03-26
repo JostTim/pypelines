@@ -41,7 +41,7 @@ class BaseDiskObject(metaclass=ABCMeta):
 
     @property
     def object_name(self):
-        return f"{self.step.full_name}{'.'+self.extra if self.extra else ''}"
+        return f"{self.step.relative_name}{'.' + self.extra if self.extra else ''}"
 
     @abstractmethod
     def version_deprecated(self) -> bool:
@@ -88,7 +88,7 @@ class BaseDiskObject(metaclass=ABCMeta):
     def multisession_unpacker(sessions, datas):
         raise NotImplementedError
 
-    def disk_step_instance(self) -> "BaseStep":
+    def disk_step_instance(self) -> "BaseStep | None":
         """Returns an instance of the step that corresponds to the file on disk."""
         if self.disk_step is not None:
             return self.step.pipe.steps[self.disk_step]
@@ -108,7 +108,7 @@ class BaseDiskObject(metaclass=ABCMeta):
     def get_status_message(self):
         loadable_disk_message = "A disk object is loadable. " if self.is_loadable() else ""
         deprecated_disk_message = (
-            f"This object's version is { 'deprecated' if self.version_deprecated() else 'the current one' }. "
+            f"This object's version is {'deprecated' if self.version_deprecated() else 'the current one'}. "
         )
         step_level_disk_message = (
             "This object's step level is"
@@ -127,7 +127,7 @@ class BaseDiskObject(metaclass=ABCMeta):
             else ""
         )
         return (
-            f"{self.object_name} object has{ ' a' if self.is_matching() else ' no' } valid disk object found."
+            f"{self.object_name} object has {'a' if self.is_matching() else 'no'} valid disk object found."
             f" {found_disk_object_description}{loadable_disk_message}"
         )
 

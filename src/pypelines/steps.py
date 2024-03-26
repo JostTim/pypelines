@@ -6,7 +6,7 @@ import logging, inspect
 from dataclasses import dataclass
 
 from types import MethodType
-from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING
+from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -54,6 +54,17 @@ def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]
 
 class BaseStep:
 
+    step_name: str
+
+    requires: List["BaseStep"]
+    version: str | int
+    do_dispatch: bool
+    callbacks: List[Callable]
+
+    worker: Callable
+    pipe: "BasePipe"
+    pipeline: "Pipeline"
+
     def __init__(
         self,
         pipeline: "Pipeline",
@@ -85,21 +96,29 @@ class BaseStep:
 
         self.multisession = self.pipe.multisession_class(self)
 
+        if self.pipeline.runner_backend:
+            queued_runner = self.pipeline.runner_backend.wrap_step(self)
+            setattr(self, "queue", queued_runner)
+
     @property
-    def requirement_stack(self):
+    def requirement_stack(self) -> Callable:
         return partial(self.pipeline.get_requirement_stack, instance=self)
 
     @property
-    def pipe_name(self):
+    def pipe_name(self) -> str:
         return self.pipe.pipe_name
 
     @property
-    def full_name(self):
+    def relative_name(self) -> str:
         return f"{self.pipe_name}.{self.step_name}"
 
-    # @property
-    # def single_step(self):
-    #     return self.pipe.single_step
+    @property
+    def pipeline_name(self) -> str:
+        return self.pipe.pipeline.pipeline_name
+
+    @property
+    def complete_name(self) -> str:
+        return f"{self.pipeline_name}.{self.relative_name}"
 
     def disk_step(self, session, extra=""):
         disk_object = self.get_disk_object(session, extra)
@@ -223,9 +242,9 @@ class BaseStep:
             )  # a flag to know if we are in requirement run or toplevel
 
             if in_requirement:
-                logger = logging.getLogger(f"╰─>req.{self.full_name}"[:NAMELENGTH])
+                logger = logging.getLogger(f"╰─>req.{self.relative_name}"[:NAMELENGTH])
             else:
-                logger = logging.getLogger(f"gen.{self.full_name}"[:NAMELENGTH])
+                logger = logging.getLogger(f"gen.{self.relative_name}"[:NAMELENGTH])
 
             if refresh and skip:
                 raise ValueError(
@@ -263,8 +282,8 @@ class BaseStep:
 
                     elif skip:
                         logger.load(
-                            f"File exists for {self.full_name}{'.' + extra if extra else ''}. Loading and processing"
-                            " will be skipped"
+                            f"File exists for {self.relative_name}{'.' + extra if extra else ''}."
+                            " Loading and processing will be skipped"
                         )
                         if not check_requirements or refresh_requirements is not False:
                             return None
@@ -287,15 +306,18 @@ class BaseStep:
                             result = disk_object.load()
                         except IOError as e:
                             raise IOError(
-                                f"The DiskObject responsible for loading {self.full_name} has `is_loadable() == True`"
+                                f"The DiskObject responsible for loading {self.relative_name}"
+                                " has `is_loadable() == True`"
                                 " but the loading procedure failed. Double check and test your DiskObject check_disk"
                                 " and load implementation. Check the original error above."
                             ) from e
 
-                        logger.load(f"Loaded {self.full_name}{'.' + extra if extra else ''} sucessfully.")
+                        logger.load(f"Loaded {self.relative_name}{'.' + extra if extra else ''} sucessfully.")
                         return result
                 else:
-                    logger.load(f"Could not find or load {self.full_name}{'.' + extra if extra else ''} saved file.")
+                    logger.load(
+                        f"Could not find or load {self.relative_name}{'.' + extra if extra else ''} saved file."
+                    )
             else:
                 logger.load("`refresh` was set to True, ignoring the state of disk files and running the function.")
 
@@ -322,7 +344,7 @@ class BaseStep:
                         if isinstance(refresh_requirements, list):
                             _refresh = (
                                 True
-                                if step.pipe_name in refresh_requirements or step.full_name in refresh_requirements
+                                if step.pipe_name in refresh_requirements or step.relative_name in refresh_requirements
                                 else False
                             )
 
@@ -343,16 +365,18 @@ class BaseStep:
                 return None
 
             if in_requirement:
-                logger.header(f"Performing the requirement {self.full_name}{'.' + extra if extra else ''}")
+                logger.header(f"Performing the requirement {self.relative_name}{'.' + extra if extra else ''}")
             else:
-                logger.header(f"Performing the computation to generate {self.full_name}{'.' + extra if extra else ''}")
+                logger.header(
+                    f"Performing the computation to generate {self.relative_name}{'.' + extra if extra else ''}"
+                )
             kwargs.update({"extra": extra})
             if self.is_refresh_in_kwargs():
                 kwargs.update({"refresh": refresh})
             result = self.pipe.pre_run_wrapper(self.worker(session, *args, **kwargs))
 
             if save_output:
-                logger.save(f"Saving the generated {self.full_name}{'.' + extra if extra else ''} output.")
+                logger.save(f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output.")
                 disk_object.save(result)
 
                 # AFTER the saving has been done, if there is some callback function that should be run, we execute them
@@ -414,7 +438,7 @@ class BaseStep:
         sig = inspect.signature(self.worker)
         param = sig.parameters.get("extra")
         if param is None:
-            raise ValueError(f"Parameter extra not found in function {self.full_name}")
+            raise ValueError(f"Parameter extra not found in function {self.relative_name}")
         if param.default is param.empty:
             raise ValueError("Parameter extra does not have a default value")
         return param.default
@@ -431,8 +455,8 @@ class BaseStep:
             req_step = [step for step in self.requirement_stack() if step.pipe_name == pipe_name][-1]
         except IndexError as e:
             raise IndexError(
-                f"Could not find a required step with the pipe_name {pipe_name} for the step {self.full_name}. Are you"
-                " sure it figures in the requirement stack ?"
+                f"Could not find a required step with the pipe_name {pipe_name} for the step {self.relative_name}. "
+                "Are you sure it figures in the requirement stack ?"
             ) from e
         return req_step.load(session, extra=extra)
 
@@ -443,21 +467,25 @@ class BaseStep:
         raise NotImplementedError
 
     def start_remotely(self, session, extra=None, **kwargs):
-        if not self.pipeline.use_celery:
+
+        queued_runner = getattr(self, "queue", None)
+
+        if queued_runner is None:
             raise NotImplementedError(
-                "Cannot use this feature with a pipeline that doesn't have a celery cluster access"
+                "Cannot use this feature with a pipeline that doesn't have an implemented and working runner backend"
             )
+
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
 
-        worker = self.pipeline.celery.app.tasks[self.full_name]
+        worker = self.pipeline.celery.app.tasks[self.relative_name]
         task_dict = connector.alyx.rest(
             "tasks",
             "create",
             data={
                 "session": session.name,
-                "name": self.full_name,
+                "name": self.relative_name,
                 "arguments": kwargs,
                 "status": "Waiting",
                 "executable": self.pipeline.celery.app_name,

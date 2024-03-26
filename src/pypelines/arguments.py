@@ -51,7 +51,9 @@ def autoload_arguments(wrapped_function, step):
 
         config_kwargs = get_step_arguments(session, step)
         if config_kwargs:  # new_kwargs is not empty
-            local_log.note(f"Using the arguments for the function {step.full_name} found in pipelines_arguments.json.")
+            local_log.note(
+                f"Using the arguments for the function {step.relative_name} found in pipelines_arguments.json."
+            )
         # this loop is just to show to log wich arguments have been overriden
         # from the json config by some arguments in the code
         overrides_names = []
@@ -62,7 +64,7 @@ def autoload_arguments(wrapped_function, step):
         if overrides_names:
             local_log.note(
                 f"Values of pipelines_arguments.json arguments : {', '.join(overrides_names)}, are overrided by the"
-                f" current call arguments to {step.full_name}"
+                f" current call arguments to {step.relative_name}"
             )
 
         config_kwargs.update(kwargs)
@@ -75,13 +77,13 @@ def get_step_arguments(session, step):
     local_log = getLogger("autoload_arguments")
 
     try:
-        config_args = read_session_arguments_file(session, step)["functions"][step.full_name]
+        config_args = read_session_arguments_file(session, step)["functions"][step.relative_name]
     except FileNotFoundError as e:
         local_log.debug(f"{type(e).__name__} : {e}. Skipping")
         return {}
     except KeyError:
         local_log.debug(
-            f"Could not find the `functions` key or the key `{step.full_name}` in pipelines_arguments.json file at"
+            f"Could not find the `functions` key or the key `{step.relative_name}` in pipelines_arguments.json file at"
             f" {session.path}. Skipping"
         )
         return {}

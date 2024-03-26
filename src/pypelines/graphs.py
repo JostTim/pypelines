@@ -1,10 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from networkx import DiGraph
+
 
 class PipelineGraph:
-    callable_graph = None
-    name_graph = None
+    callable_graph: "DiGraph"
+    name_graph: "DiGraph"
 
     def __init__(self, pipeline):
         from networkx import DiGraph, draw, spring_layout, draw_networkx_labels
@@ -20,17 +25,16 @@ class PipelineGraph:
         self.make_graphs()
 
     def make_graphs(self):
-        from networkx import DiGraph
 
-        callable_graph = DiGraph()
-        display_graph = DiGraph()
+        callable_graph = self.DiGraph()
+        display_graph = self.DiGraph()
         for pipe in self.pipeline.pipes.values():
             for step in pipe.steps.values():
                 callable_graph.add_node(step)
-                display_graph.add_node(step.full_name)
+                display_graph.add_node(step.relative_name)
                 for req in step.requires:
                     callable_graph.add_edge(req, step)
-                    display_graph.add_edge(req.full_name, step.full_name)
+                    display_graph.add_edge(req.relative_name, step.relative_name)
 
         self.callable_graph = callable_graph
         self.name_graph = display_graph
@@ -101,7 +105,7 @@ class PipelineGraph:
             # if len([]) # TODO : add distinctions of fractions of y if multiple nodes of the same pipe have same level
             x = pipe_x_indices[node.pipe]
             y = node.get_level()
-            pos[node.full_name] = (x, -y)
+            pos[node.relative_name] = (x, -y)
         return pos
 
     def separate_crowded_levels(self, pos, max_spacing=0.35):

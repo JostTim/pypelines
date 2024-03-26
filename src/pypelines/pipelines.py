@@ -1,6 +1,8 @@
-from typing import Callable, Type, Dict, Iterable, Protocol, TYPE_CHECKING
 from logging import getLogger
 import os
+from .tasks import BaseTaskBackend
+
+from typing import Callable, Type, Dict, List, Iterable, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .pipes import BasePipe
@@ -9,17 +11,17 @@ if TYPE_CHECKING:
 
 
 class Pipeline:
-    use_celery = False
     pipes: Dict[str, "BasePipe"]
+    runner_backend_class = BaseTaskBackend
 
-    def __init__(self, name: str, conf_path=None, use_celery=False):
+    def __init__(self, name: str, **runner_args):
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
-        self.conf_path = os.path.dirname(conf_path) if conf_path is not None else None
 
-        if use_celery:
-            self.configure_celery()
+        # create a runner backend, if fails, the runner_backend object evaluates to False as a boolean
+        # (to be checked and used througout the pipeline wrappers creation)
+        self.runner_backend = self.runner_backend_class(self, **runner_args)
 
     def register_pipe(self, pipe_class: Type["BasePipe"]) -> Type["BasePipe"]:
         """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
@@ -76,7 +78,9 @@ class Pipeline:
 
         self.resolved = True
 
-    def get_requirement_stack(self, instance: "BaseStep", names: bool = False, max_recursion: int = 100) -> list:
+    def get_requirement_stack(
+        self, instance: "BaseStep", names: bool = False, max_recursion: int = 100
+    ) -> List["BaseStep"]:
         """Returns a list containing the ordered Steps that the "instance" Step object requires for being ran.
 
         Args:
@@ -93,11 +97,11 @@ class Pipeline:
         """
 
         self.resolve()  # ensure requires lists are containing instances and not strings
-        parents = []
+        parents: List["BaseStep"] = []
         required_steps = []
 
         def recurse_requirement_stack(
-            instance,
+            instance: "BaseStep",
         ):
             """
             _summary_
@@ -130,7 +134,7 @@ class Pipeline:
 
         recurse_requirement_stack(instance)
         if names:
-            required_steps = [req.full_name for req in required_steps]
+            required_steps = [req.relative_name for req in required_steps]
         return required_steps
 
     @property
@@ -138,29 +142,3 @@ class Pipeline:
         from .graphs import PipelineGraph
 
         return PipelineGraph(self)
-
-    def configure_celery(self) -> None:
-        try : 
-            from .tasks import CeleryHandler
-        except ImportError:
-            getLogger().warning(
-                f"Celery is not installed. Cannot set it up for the pipeline {self.pipeline_name}"
-                "Don't worry, about this alert, "
-                "this is not be an issue if you didn't explicitely planned on using celery."
-            )
-            return
-
-        celery = CeleryHandler(self.conf_path, self.pipeline_name)
-        if celery.success:
-            self.celery = celery
-            self.use_celery = True
-        else:
-            getLogger().warning(
-                f"Could not initialize celery for the pipeline {self.pipeline_name}."
-                "Don't worry, about this alert, "
-                "this is not be an issue if you didn't explicitely planned on using celery."
-            )
-
-    def finalize(self):
-        if self.use_celery:
-            self.celery.app.start()  # pyright: ignore

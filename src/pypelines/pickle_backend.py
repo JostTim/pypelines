@@ -52,10 +52,14 @@ class PickleDiskObject(BaseDiskObject):
         # we compare levels with the currently called step
         # if disk step level < current called step level, we return True, else we return False.
         if disk_step.get_level(selfish=True) < self.step.get_level(selfish=True):
-            logger.debug(f"Disk step {disk_step.full_name} was lower than {self.step.full_name}. Returning True")
+            logger.debug(
+                f"Disk step {disk_step.relative_name} was lower than {self.step.relative_name}. Returning True"
+            )
             return True
 
-        logger.debug(f"Disk step {disk_step.full_name} was higher or equal than {self.step.full_name}. Returning False")
+        logger.debug(
+            f"Disk step {disk_step.relative_name} was higher or equal than {self.step.relative_name}. Returning False"
+        )
         return False
 
     @property
@@ -157,7 +161,7 @@ class PickleDiskObject(BaseDiskObject):
             return True
         else:
             logger.load(
-                f"More than one partial match was found for {self.step.full_name}. Cannot auto select. Expected :"
+                f"More than one partial match was found for {self.step.relative_name}. Cannot auto select. Expected :"
                 f" {expected_values}, Found : {match_datas}"
             )
             return False
@@ -189,7 +193,7 @@ class PickleDiskObject(BaseDiskObject):
 
     def load(self):
         logger = logging.getLogger("PickleDiskObject.load")
-        logger.debug(f"Current disk file status : {self.current_disk_file = }")
+        logger.debug(f"Current disk file status : {self.current_disk_file=}")
         if self.current_disk_file is None:
             raise IOError(
                 "Could not find a file to load. Either no file was found on disk, or you forgot to run 'check_disk()'"
