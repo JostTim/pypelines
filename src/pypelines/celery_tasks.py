@@ -33,6 +33,7 @@ def get_runner(task_name: str):
             try:
                 session = task.get_session()
                 application = task.get_application()
+                arguments = task.arguments
 
                 with LogTask(task) as log_object:
                     logger = log_object.logger
@@ -44,7 +45,13 @@ def get_runner(task_name: str):
                         step: "BaseStep" = (
                             application.pipelines[task.pipeline_name].pipes[task.pipe_name].steps[task.step_name]
                         )
-                        step.generate(session, extra=extra, skip=True, check_requirements=True, **task.arguments)
+                        if arguments.get("refresh", False) or arguments.get("refresh_requirements", []):
+                            skip = False
+                        else:
+                            skip = True
+                        arguments.pop(skip)
+
+                        step.generate(session, extra=extra, skip=skip, check_requirements=True, **task.arguments)
                         task.status_from_logs(log_object)
                     except Exception as e:
                         traceback_msg = format_traceback_exc()
