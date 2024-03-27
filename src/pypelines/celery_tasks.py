@@ -269,7 +269,7 @@ class LogTask:
         self.logger.removeHandler(self.logger.handlers[-1])
 
 
-def create_celery_app(conf_path, app_name="pypelines") -> "Celery":
+def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery":
 
     failure_message = (
         f"Celery app : {app_name} failed to be created."
@@ -309,6 +309,7 @@ def create_celery_app(conf_path, app_name="pypelines") -> "Celery":
         address = settings.address
         backend = settings.connexion.backend
         conf_data = settings.conf
+        v_host = settings.virtual_host if v_host is None else v_host
     except (AttributeError, KeyError) as e:
         logger.warning(f"{failure_message} {e}")
         return None
@@ -322,7 +323,7 @@ def create_celery_app(conf_path, app_name="pypelines") -> "Celery":
     try:
         app = Celery(
             app_display_name,
-            broker=f"{broker_type}://{account}:{password}@{address}/{app_name}",
+            broker=f"{broker_type}://{account}:{password}@{address}/{v_host}",
             backend=f"{backend}://",
         )
     except Exception as e:
@@ -341,13 +342,13 @@ def create_celery_app(conf_path, app_name="pypelines") -> "Celery":
     return app
 
 
-def create_worker_for_app(app_name):
-    from celery.bin.worker import worker as celery_worker
+# def create_worker_for_app(app_name):
+#     from celery.bin.worker import worker as celery_worker
 
-    def start_worker(app):
-        worker = celery_worker(app=app)
-        options = {
-            "loglevel": "INFO",
-            "traceback": True,
-        }
-        worker.run(**options)
+#     def start_worker(app):
+#         worker = celery_worker(app=app)
+#         options = {
+#             "loglevel": "INFO",
+#             "traceback": True,
+#         }
+#         worker.run(**options)
