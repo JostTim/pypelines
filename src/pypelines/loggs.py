@@ -129,12 +129,11 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         """
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
-        padding_dict = {
-            name: int(padding) if padding else 0 for name, padding in result}
+        padding_dict = {name: int(padding) if padding else 0 for name, padding in result}
 
         return padding_dict
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord):
         """_summary_
 
         Args:
@@ -159,13 +158,11 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
                 missing_length = 0 if missing_length < 0 else missing_length
                 if part_name in self.dynamic_levels.keys():
                     dyn_keys = self.dynamic_levels[part_name]
-                    dynamic_style = {k: v for k, v in style.items(
-                    ) if k in dyn_keys or dyn_keys == "all"}
-                    part = coloredlogs.ansi_wrap(
-                        coloredlogs.coerce_string(part), **dynamic_style)
+                    dynamic_style = {k: v for k, v in style.items() if k in dyn_keys or dyn_keys == "all"}
+                    part = coloredlogs.ansi_wrap(coloredlogs.coerce_string(part), **dynamic_style)
                 part = part + (" " * missing_length)
                 setattr(copy, part_name, part)
-            record = copy
+            record = copy  # type: ignore
 
         s = self.formatMessage(record)
         if record.exc_info:
@@ -304,8 +301,7 @@ class LogContext:
         for handler in self.root_logger.handlers:
             for filter in handler.filters:
                 if getattr(filter, "context_msg", "") == self.context_msg:
-                    self.root_logger.debug(
-                        f"Filter already added to handler {handler}")
+                    self.root_logger.debug(f"Filter already added to handler {handler}")
                     found = True
                     break
 
@@ -317,8 +313,7 @@ class LogContext:
             context_filter = ContextFilter(self.context_msg)
             handler.addFilter(context_filter)
             self.context_filters[handler] = context_filter
-            self.root_logger.debug(
-                f"Added filter {context_filter} to handler {handler}")
+            self.root_logger.debug(f"Added filter {context_filter} to handler {handler}")
             break
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -334,8 +329,7 @@ class LogContext:
             if filer_to_remove is None:
                 continue
             else:
-                self.root_logger.debug(
-                    f"Removing filter {filer_to_remove} from handler {handler} in this context")
+                self.root_logger.debug(f"Removing filter {filer_to_remove} from handler {handler} in this context")
                 handler.removeFilter(filer_to_remove)
 
 
@@ -412,14 +406,11 @@ def addLoggingLevel(levelName, levelNum, methodName=None, if_exists="raise"):
         if if_exists == "keep":
             return
         if hasattr(logging, levelName):
-            raise AttributeError(
-                "{} already defined in logging module".format(levelName))
+            raise AttributeError("{} already defined in logging module".format(levelName))
         if hasattr(logging, methodName):
-            raise AttributeError(
-                "{} already defined in logging module".format(methodName))
+            raise AttributeError("{} already defined in logging module".format(methodName))
         if hasattr(logging.getLoggerClass(), methodName):
-            raise AttributeError(
-                "{} already defined in logger class".format(methodName))
+            raise AttributeError("{} already defined in logger class".format(methodName))
 
     # This method was inspired by the answers to Stack Overflow post
     # http://stackoverflow.com/q/2183233/2988730, especially

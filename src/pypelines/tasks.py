@@ -32,17 +32,3 @@ class BaseTaskBackend:
 
     def create_task_manager(self, step) -> "BaseStepTaskManager":
         return self.task_manager_class(step, self)
-
-    #     wrapped_step = getattr(step, "queue", None)
-    #     if wrapped_step is None:
-    #         # do not register
-    #         pass
-    #     # registration code here
-
-    # def wrap_step(self, step):
-
-    #     @wraps(step.generate)
-    #     def wrapper(*args, **kwargs):
-    #         return step.generate(*args, **kwargs)
-
-    #     return wrapper
