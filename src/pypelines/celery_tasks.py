@@ -27,83 +27,48 @@ class CeleryAlyxTaskManager(BaseStepTaskManager):
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
-        task = TaskRecord(task_id)
+        task = CeleryTaskRecord(task_id)
 
         try:
-            session = connector.search(id=task.session, details=True, no_cache=True)
+            session = connector.search(
+                id=task["session"], details=True, no_cache=True)
 
             with LogTask(task) as log_object:
                 logger = log_object.logger
-                task.log = log_object.filename
-                task.status = "Started"
-                task = TaskRecord(connector.alyx.rest("tasks", "partial_update", **task.export()))
+                task["log"] = log_object.filename
+                task["status"] = "Started"
+                task.partial_update()
 
                 try:
-                    self.step.generate(session, extra=extra, skip=True, check_requirements=True, **task.arguments)
-                    task.status = self.status_from_logs(log_object)
+                    self.step.generate(
+                        session, extra=extra, skip=True, check_requirements=True, **task.arguments)
+                    task.status_from_logs(log_object)
                 except Exception as e:
                     traceback_msg = format_traceback_exc()
                     logger.critical(f"Fatal Error : {e}")
                     logger.critical("Traceback :\n" + traceback_msg)
-                    task.status = "Failed"
+                    task["status"] = "Failed"
 
         except Exception as e:
             # if it fails outside of the nested try statement, we can't store logs files,
             # and we mention the failure through alyx directly.
-            task.status = "Uncatched_Fail"
-            task.log = str(e)
+            task["status"] = "Uncatched_Fail"
+            task["log"] = str(e)
 
-        connector.alyx.rest("tasks", "partial_update", **task.export())
+        task.partial_update()
 
     def start(self, session, extra=None, **kwargs):
 
         if not self.backend:
             raise NotImplementedError(
-                "Cannot use this feature with a pipeline that doesn't have an implemented and working runner backend"
+                "Cannot start a task on a celery cluster as this pipeline "
+                "doesn't have a working celery backend"
             )
 
-        from one import ONE
-
-        connector = ONE(mode="remote", data_access_mode="remote")
-
-        worker = self.backend.app.tasks[self.step.complete_name]
-
-        TaskRecord()
-
-        task_dict = connector.alyx.rest(
-            "tasks",
-            "create",
-            data={
-                "session": session.name,
-                "name": self.step.complete_name,
-                "arguments": kwargs,
-                "status": "Waiting",
-                "executable": self.backend.app_name,
-            },
-        )
-
-        response_handle = worker.delay(task_dict["id"], extra=extra)
-        # launch the task on the server, and waits until available.
-        return RemoteTask(task_dict, response_handle)
-
-    @staticmethod
-    def status_from_logs(log_object):
-        with open(log_object.fullpath, "r") as f:
-            content = f.read()
-
-        if len(content) == 0:
-            return "No_Info"
-        if "CRITICAL" in content:
-            return "Failed"
-        elif "ERROR" in content:
-            return "Errors"
-        elif "WARNING" in content:
-            return "Warnings"
-        else:
-            return "Complete"
+        return CeleryTaskRecord.create(self, session, extra, **kwargs)
 
 
-class TaskRecord(dict):
+class CeleryTaskRecord(dict):
     # a class to make dictionnary keys accessible with attribute syntax
     def __init__(self, task_id, task_infos_dict={}, response_handle=None):
         if task_infos_dict:
@@ -115,35 +80,62 @@ class TaskRecord(dict):
             task_infos_dict = connector.alyx.rest("tasks", "read", id=task_id)
             super().__init__(task_infos_dict)
 
+        self.session = 
         self.response = response_handle
+
+    def status_from_logs(self, log_object):
+        with open(log_object.fullpath, "r") as f:
+            content = f.read()
+
+        if len(content) == 0:
+            status = "No_Info"
+        elif "CRITICAL" in content:
+            status = "Failed"
+        elif "ERROR" in content:
+            status = "Errors"
+        elif "WARNING" in content:
+            status = "Warnings"
+        else:
+            status = "Complete"
+
+        self["status"] = status
+
+    def partial_update(self):
+        from one import ONE
+        connector = ONE(mode="remote", data_access_mode="remote")
+        connector.alyx.rest("tasks", "partial_update", **self.export())
 
     @property
     def arguments(self):
         args = self.get("arguments", {})
         return args if args else {}
 
+    @property
+    def session_path(self):
+        from one import ONE
+        connector = ONE(mode="remote", data_access_mode="remote")
+        connector.alyx.rest(sess)
+
     def export(self):
         return {"id": self["id"], "data": {k: v for k, v in self.items() if k not in ["id", "session_path"]}}
 
     @staticmethod
-    def create(step: "BaseStep", session, backend, extra=None, **kwargs):
+    def create(task_manager: CeleryAlyxTaskManager, session, extra=None, **kwargs):
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
 
         data = {
             "session": session.name,
-            "name": step.complete_name,
+            "name": task_manager.step.complete_name,
             "arguments": kwargs,
             "status": "Waiting",
-            "executable": backend.app_name,
+            "executable": task_manager.backend.app_name,
         }
-        connector.alyx.rest("tasks", "create", data=data)
 
         task_dict = connector.alyx.rest("tasks", "create", data=data)
 
-        worker = backend.app.tasks[step.complete_name]
-
+        worker = task_manager.backend.app.tasks[task_manager.step.complete_name]
         response_handle = worker.delay(task_dict["id"], extra=extra)
 
         return TaskRecord(task_dict["id"], task_dict, response_handle)
@@ -186,6 +178,56 @@ def get_setting_files_path(conf_path, app_name) -> List[Path]:
     return files
 
 
+class LogTask:
+    def __init__(self, task_record, username="", level="LOAD"):
+        self.path = os.path.normpath(task_record.session_path)
+        self.username = username
+        os.makedirs(self.path, exist_ok=True)
+        self.worker_pk = task_record.id
+        self.task_name = task_record.name
+        self.level = getattr(logging, level.upper())
+
+    def __enter__(self):
+        self.logger = logging.getLogger()
+        self.set_handler()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.remove_handler()
+
+    def set_handler(self):
+        self.filename = os.path.join(
+            "logs", f"task_log.{self.task_name}.{self.worker_pk}.log")
+        self.fullpath = os.path.join(self.path, self.filename)
+        fh = logging.FileHandler(self.fullpath)
+        f_formater = FileFormatter()
+        coloredlogs.HostNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            style=f_formater.STYLE,
+            use_chroot=True,
+        )
+        coloredlogs.ProgramNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            programname=self.task_name,
+            style=f_formater.STYLE,
+        )
+        coloredlogs.UserNameFilter.install(
+            fmt=f_formater.FORMAT,
+            handler=fh,
+            username=self.username,
+            style=f_formater.STYLE,
+        )
+
+        fh.setLevel(self.level)
+        fh.setFormatter()
+        self.logger.addHandler(fh)
+
+    def remove_handler(self):
+        self.logger.removeHandler(self.logger.handlers[-1])
+
+
 def create_celery_app(conf_path, app_name="pypelines"):
 
     failure_message = (
@@ -198,19 +240,22 @@ def create_celery_app(conf_path, app_name="pypelines"):
     settings_files = get_setting_files_path(conf_path, app_name)
 
     if len(settings_files) == 0:
-        logger.warning(f"{failure_message} Could not find celery toml config files.")
+        logger.warning(
+            f"{failure_message} Could not find celery toml config files.")
         return None
 
     try:
         from dynaconf import Dynaconf
     except ImportError:
-        logger.warning(f"{failure_message} Could not import dynaconf. Maybe it is not istalled ?")
+        logger.warning(
+            f"{failure_message} Could not import dynaconf. Maybe it is not istalled ?")
         return None
 
     try:
         settings = Dynaconf(settings_files=settings_files)
     except Exception as e:
-        logger.warning(f"{failure_message} Could not create dynaconf object. {e}")
+        logger.warning(
+            f"{failure_message} Could not create dynaconf object. {e}")
         return None
 
     try:
@@ -228,7 +273,8 @@ def create_celery_app(conf_path, app_name="pypelines"):
     try:
         from celery import Celery
     except ImportError:
-        logger.warning(f"{failure_message} Could not import celery. Maybe is is not installed ?")
+        logger.warning(
+            f"{failure_message} Could not import celery. Maybe is is not installed ?")
         return None
 
     try:
@@ -238,14 +284,16 @@ def create_celery_app(conf_path, app_name="pypelines"):
             backend=f"{backend}://",
         )
     except Exception as e:
-        logger.warning(f"{failure_message} Could not create app. Maybe rabbitmq server @{address} is not running ? {e}")
+        logger.warning(
+            f"{failure_message} Could not create app. Maybe rabbitmq server @{address} is not running ? {e}")
         return None
 
     for key, value in conf_data.items():
         try:
             setattr(app.conf, key, value)
         except Exception as e:
-            logger.warning(f"{failure_message} Could assign extra attribute {key} to celery app. {e}")
+            logger.warning(
+                f"{failure_message} Could assign extra attribute {key} to celery app. {e}")
             return None
 
     return app

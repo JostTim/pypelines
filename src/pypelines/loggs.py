@@ -1,4 +1,7 @@
-import logging, sys, re, os
+import logging
+import sys
+import re
+import os
 from functools import wraps
 import coloredlogs
 
@@ -126,7 +129,8 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         """
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
-        padding_dict = {name: int(padding) if padding else 0 for name, padding in result}
+        padding_dict = {
+            name: int(padding) if padding else 0 for name, padding in result}
 
         return padding_dict
 
@@ -155,8 +159,10 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
                 missing_length = 0 if missing_length < 0 else missing_length
                 if part_name in self.dynamic_levels.keys():
                     dyn_keys = self.dynamic_levels[part_name]
-                    dynamic_style = {k: v for k, v in style.items() if k in dyn_keys or dyn_keys == "all"}
-                    part = coloredlogs.ansi_wrap(coloredlogs.coerce_string(part), **dynamic_style)
+                    dynamic_style = {k: v for k, v in style.items(
+                    ) if k in dyn_keys or dyn_keys == "all"}
+                    part = coloredlogs.ansi_wrap(
+                        coloredlogs.coerce_string(part), **dynamic_style)
                 part = part + (" " * missing_length)
                 setattr(copy, part_name, part)
             record = copy
@@ -234,55 +240,6 @@ class FileFormatter(SugarColoredFormatter):
     FORMAT = f"[%(asctime)s] %(hostname)s %(levelname)-{LEVELLENGTH}s : %(name)-{NAMELENGTH}s : %(message)s"
 
 
-class LogTask:
-    def __init__(self, task_record, username="", level="LOAD"):
-        self.path = os.path.normpath(task_record.session_path)
-        self.username = username
-        os.makedirs(self.path, exist_ok=True)
-        self.worker_pk = task_record.id
-        self.task_name = task_record.name
-        self.level = getattr(logging, level.upper())
-
-    def __enter__(self):
-        self.logger = logging.getLogger()
-        self.set_handler()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.remove_handler()
-
-    def set_handler(self):
-        self.filename = os.path.join("logs", f"task_log.{self.task_name}.{self.worker_pk}.log")
-        self.fullpath = os.path.join(self.path, self.filename)
-        fh = logging.FileHandler(self.fullpath)
-        f_formater = FileFormatter()
-        coloredlogs.HostNameFilter.install(
-            fmt=f_formater.FORMAT,
-            handler=fh,
-            style=f_formater.STYLE,
-            use_chroot=True,
-        )
-        coloredlogs.ProgramNameFilter.install(
-            fmt=f_formater.FORMAT,
-            handler=fh,
-            programname=self.task_name,
-            style=f_formater.STYLE,
-        )
-        coloredlogs.UserNameFilter.install(
-            fmt=f_formater.FORMAT,
-            handler=fh,
-            username=self.username,
-            style=f_formater.STYLE,
-        )
-
-        fh.setLevel(self.level)
-        fh.setFormatter()
-        self.logger.addHandler(fh)
-
-    def remove_handler(self):
-        self.logger.removeHandler(self.logger.handlers[-1])
-
-
 class ContextFilter(logging.Filter):
     """This is a filter which injects contextual information into the log."""
 
@@ -347,7 +304,8 @@ class LogContext:
         for handler in self.root_logger.handlers:
             for filter in handler.filters:
                 if getattr(filter, "context_msg", "") == self.context_msg:
-                    self.root_logger.debug(f"Filter already added to handler {handler}")
+                    self.root_logger.debug(
+                        f"Filter already added to handler {handler}")
                     found = True
                     break
 
@@ -359,7 +317,8 @@ class LogContext:
             context_filter = ContextFilter(self.context_msg)
             handler.addFilter(context_filter)
             self.context_filters[handler] = context_filter
-            self.root_logger.debug(f"Added filter {context_filter} to handler {handler}")
+            self.root_logger.debug(
+                f"Added filter {context_filter} to handler {handler}")
             break
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -375,7 +334,8 @@ class LogContext:
             if filer_to_remove is None:
                 continue
             else:
-                self.root_logger.debug(f"Removing filter {filer_to_remove} from handler {handler} in this context")
+                self.root_logger.debug(
+                    f"Removing filter {filer_to_remove} from handler {handler} in this context")
                 handler.removeFilter(filer_to_remove)
 
 
@@ -452,11 +412,14 @@ def addLoggingLevel(levelName, levelNum, methodName=None, if_exists="raise"):
         if if_exists == "keep":
             return
         if hasattr(logging, levelName):
-            raise AttributeError("{} already defined in logging module".format(levelName))
+            raise AttributeError(
+                "{} already defined in logging module".format(levelName))
         if hasattr(logging, methodName):
-            raise AttributeError("{} already defined in logging module".format(methodName))
+            raise AttributeError(
+                "{} already defined in logging module".format(methodName))
         if hasattr(logging.getLoggerClass(), methodName):
-            raise AttributeError("{} already defined in logger class".format(methodName))
+            raise AttributeError(
+                "{} already defined in logger class".format(methodName))
 
     # This method was inspired by the answers to Stack Overflow post
     # http://stackoverflow.com/q/2183233/2988730, especially
