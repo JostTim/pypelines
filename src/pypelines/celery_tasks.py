@@ -280,7 +280,7 @@ class LogTask:
         self.logger.removeHandler(self.logger.handlers[-1])
 
 
-def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery":
+def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery | None":
 
     failure_message = (
         f"Celery app : {app_name} failed to be created."
@@ -350,10 +350,14 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery":
 
     APPLICATIONS_STORE[app_name] = app
 
+    from celery import Task
+
+    class handshake(Task):
+        name = "handshake"
+
+        def run(self):
+            return f"{node()} is happy to shake your hand and says hello !"
+
     app.register_task(handshake)
 
     return app
-
-
-def handshake():
-    return f"{node()} is happy to shake your hand and says hello !"
