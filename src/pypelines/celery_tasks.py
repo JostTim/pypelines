@@ -309,7 +309,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery":
         address = settings.address
         backend = settings.connexion.backend
         conf_data = settings.conf
-        v_host = settings.virtual_host if v_host is None else v_host
+        v_host = settings.broker_conf.virtual_host if v_host is None else v_host
     except (AttributeError, KeyError) as e:
         logger.warning(f"{failure_message} {e}")
         return None
