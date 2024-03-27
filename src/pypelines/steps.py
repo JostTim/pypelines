@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .pipelines import Pipeline
     from .pipes import BasePipe
     from .disk import BaseDiskObject
+    from .tasks import BaseStepTaskManager
 
 
 def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]):
@@ -61,6 +62,7 @@ class BaseStep:
     do_dispatch: bool
     callbacks: List[Callable]
 
+    task: "BaseStepTaskManager"
     worker: Callable
     pipe: "BasePipe"
     pipeline: "Pipeline"
@@ -96,9 +98,7 @@ class BaseStep:
 
         self.multisession = self.pipe.multisession_class(self)
 
-        if self.pipeline.runner_backend:
-            queued_runner = self.pipeline.runner_backend.wrap_step(self)
-            setattr(self, "queue", queued_runner)
+        self.task = self.pipeline.runner_backend.create_task_manager(self)
 
     @property
     def requirement_stack(self) -> Callable:
@@ -465,45 +465,6 @@ class BaseStep:
 
     def get_arguments(self, session):
         raise NotImplementedError
-
-    def start_remotely(self, session, extra=None, **kwargs):
-
-        queued_runner = getattr(self, "queue", None)
-
-        if queued_runner is None:
-            raise NotImplementedError(
-                "Cannot use this feature with a pipeline that doesn't have an implemented and working runner backend"
-            )
-
-        from one import ONE
-
-        connector = ONE(mode="remote", data_access_mode="remote")
-
-        worker = self.pipeline.celery.app.tasks[self.relative_name]
-        task_dict = connector.alyx.rest(
-            "tasks",
-            "create",
-            data={
-                "session": session.name,
-                "name": self.relative_name,
-                "arguments": kwargs,
-                "status": "Waiting",
-                "executable": self.pipeline.celery.app_name,
-            },
-        )
-
-        response_handle = worker.delay(task_dict["id"], extra=extra)
-        # launch the task on the server, and waits until available.
-        return RemoteTask(task_dict, response_handle)
-
-
-class RemoteTask:
-    infos = None
-    response = None
-
-    def __init__(self, task_infos_dict, response_handle):
-        self.infos = task_infos_dict
-        self.response = response_handle
 
 
 @dataclass

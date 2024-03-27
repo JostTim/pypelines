@@ -1,7 +1,14 @@
 import pandas as pd
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .steps import BaseStep
+
 
 class BaseMultisessionAccessor:
+    step: "BaseStep"
+
     def __init__(self, parent):
         self.step = parent
         self._packer = self.step.pipe.disk_class.multisession_packer
@@ -68,6 +75,10 @@ class BaseMultisessionAccessor:
             session_result_dict[index] = self.step.generate(session, *args, extra=extra, **kwargs)
 
         return self._packer(sessions, session_result_dict)
+
+    def start_tasks(self, sessions):
+        for session in sessions.iterrows():
+            self.step.task.start(session)
 
 
 def assert_dataframe(sessions):
