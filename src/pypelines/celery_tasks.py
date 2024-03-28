@@ -360,7 +360,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     from celery import Task
 
     class handshake(Task):
-        name = "handshake"
+        name = f"{app_name}.handshake"
 
         def run(self):
             return f"{node()} is happy to shake your hand and says hello !"
@@ -372,7 +372,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return str(signature.replace(parameters=params))[1:-1].replace(" *,", "")
 
     class tasks_infos(Task):
-        name = "tasks_infos"
+        name = f"{app_name}.tasks_infos"
 
         def run(self, app_name):
             app = APPLICATIONS_STORE[app_name]
