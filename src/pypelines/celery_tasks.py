@@ -374,7 +374,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     class tasks_infos(Task):
         name = f"{app_name}.tasks_infos"
 
-        def run(self, app_name):
+        def run(self, app_name, selfish=False):
             app = APPLICATIONS_STORE[app_name]
             tasks_dynamic_data = {}
             pipelines = getattr(app, "pipelines", {})
@@ -392,7 +392,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                                 "pipe_name": step.pipe_name,
                                 "pipeline_name": step.pipeline_name,
                                 "requires": [item.complete_name for item in step.requires],
-                                "step_level_in_pipe": step.get_level(selfish=False),
+                                "step_level_in_pipe": step.get_level(selfish=selfish),
                             }
                             tasks_dynamic_data[step.complete_name] = task_data
             return tasks_dynamic_data
