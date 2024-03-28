@@ -365,6 +365,37 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         def run(self):
             return f"{node()} is happy to shake your hand and says hello !"
 
+    def get_signature_string(signature):
+        params = [
+            param_value for param_name, param_value in signature.parameters.items() if param_name not in ["session"]
+        ]
+        return str(signature.replace(parameters=params))[1:-1].replace(" *,", "")
+
+    class tasks_infos(Task):
+        name = "tasks_infos"
+
+        def run(self, app_name):
+            app = APPLICATIONS_STORE[app_name]
+            tasks_dynamic_data = {}
+            pipelines = getattr(app, "pipelines", {})
+            for pipeline in pipelines.values():
+                for pipe in pipeline.pipes.values():
+                    for step in pipe.steps.values():
+                        if step.complete_name in app.tasks.keys():
+                            sig = get_signature_string(step.generate.__signature__)
+                            doc = step.generate.__doc__
+                            task_data = {
+                                "signature": sig,
+                                "docstring": doc,
+                                "step_name": step.step_name,
+                                "pipe_name": step.pipe_name,
+                                "pipeline_name": step.pipeline_name,
+                                "requires": step.requires,
+                            }
+                            tasks_dynamic_data[step.complete_name] = task_data
+            return tasks_dynamic_data
+
     app.register_task(handshake)
+    app.register_task(tasks_infos)
 
     return app
