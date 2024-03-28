@@ -398,4 +398,6 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     app.register_task(handshake)
     app.register_task(tasks_infos)
 
+    logger.info(f"The celery app {app_name} was created successfully.")
+
     return app
