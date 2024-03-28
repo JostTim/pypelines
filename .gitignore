@@ -8,3 +8,4 @@ dist/*
 *.ipynb_checkpoints*
 notebooks/pipelines_tests/*
 notebooks/*.log
+build*

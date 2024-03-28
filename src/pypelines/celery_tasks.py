@@ -391,6 +391,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                                 "pipe_name": step.pipe_name,
                                 "pipeline_name": step.pipeline_name,
                                 "requires": step.requires,
+                                "step_level_in_pipe": step.get_level(selfish=True),
                             }
                             tasks_dynamic_data[step.complete_name] = task_data
             return tasks_dynamic_data
