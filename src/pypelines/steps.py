@@ -185,7 +185,7 @@ class BaseStep:
             )
         return autoload_arguments(loggedmethod(self.generation_mechanism), self)
 
-    def get_level(self, selfish=False):
+    def get_level(self, selfish=False) -> int:
         self.pipeline.resolve()
         return StepLevel(self).resolve_level(selfish=selfish)
 
@@ -567,7 +567,7 @@ class StepLevel:
             new_req.append(req)
         return new_req
 
-    def resolve_level(self, selfish: bool = False, uppermost=None):
+    def resolve_level(self, selfish: bool = False, uppermost=None) -> int:
         """Calculates and returns the "level" of the step.
 
         If `selfish` is True, only the requirements that are the same pipe as the `uppermost`
