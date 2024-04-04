@@ -443,10 +443,13 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         registered_tasks = self.control.inspect().registered_tasks()
         workers = []
         task_names = []
-        for worker, tasks in registered_tasks.items():
-            workers.append(worker)
-            for task in tasks:
-                task_names.append(task)
+        if registered_tasks:
+            for worker, tasks in registered_tasks.items():
+                workers.append(worker)
+                for task in tasks:
+                    task_names.append(task)
+
+        return {"workers": workers, "task_names": task_names}
 
     def get_celery_app_tasks(self, refresh=False):
 
@@ -502,6 +505,15 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             self, task_name, app_name, session_id, extra=extra, **kwargs
         )
         return task_record
+
+    def is_hand_shaken(self):
+        try:
+            result = self.tasks[f"{app_name}.handshake"].delay(app_name).get(timeout=1)
+            logger.warning(f"Handshake result : {result}")
+            return True
+        except ValueError:
+            logger.error("No handshake result. All workers are busy ?")
+            return False
 
     settings_files = get_setting_files_path(conf_path)
 
@@ -563,6 +575,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     app.get_remote_tasks = MethodType(get_remote_tasks, app)  # type: ignore
     app.get_celery_app_tasks = MethodType(get_celery_app_tasks, app)  # type: ignore
     app.launch_named_task_remotely = MethodType(launch_named_task_remotely, app)  # type: ignore
+    app.is_hand_shaken = MethodType(is_hand_shaken, app)  # type: ignore
 
     logger.info(f"The celery app {app_name} was created successfully.")
 
