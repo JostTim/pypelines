@@ -471,24 +471,29 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                 # logger.warning(f"Local tasks are : {self.tasks}")
 
         else:
-            if datetime.now() > app_task_data["refresh_time"]:  # we refresh if refresh time is elapsed
+            now = datetime.now()
+            if now > app_task_data["refresh_time"]:  # we refresh if refresh time is elapsed
+                logger.warning(
+                    "Time has come to auto refresh app_task_data. "
+                    f"refresh_time was {app_task_data['refresh_time']} and now is {now}"
+                )
                 refresh = True
 
             if refresh:
                 try:
                     task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=2)
                     # if the data needs to be refreshed, we don't wait for as long as for a first get of infos.
-                    app_task_data = {"task_data": task_data, "refresh_time": datetime.now() + auto_refresh_time}
+                    app_task_data = {"task_data": task_data, "refresh_time": now + auto_refresh_time}
                     logger.warning("Refreshed celery tasks data sucessfully")
                 except Exception as e:
                     logger.warning(
                         "Could not refresh tasks data from remote celery worker. All workers are is probably running. "
                         f"{e}"
                     )
-                    app_task_data["refresh_time"] = datetime.now() + failed_refresh_retry_time
+                    app_task_data["refresh_time"] = now + failed_refresh_retry_time
                 setattr(self, "task_data", app_task_data)
             else:
-                delta = (app_task_data["refresh_time"] - datetime.now()).total_seconds()
+                delta = (app_task_data["refresh_time"] - now).total_seconds()
                 logger.warning(f"Returned cached task_data. Next refresh will happen in at least {delta} seconds")
         return app_task_data["task_data"] if app_task_data is not None else None
 
