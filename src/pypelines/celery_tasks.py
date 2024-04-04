@@ -401,14 +401,16 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
         from datetime import datetime, timedelta
 
-        auto_refresh_time = timedelta(0, (20 * 1))  # a full day (24 hours of 3600 seconds)
-        failed_refresh_retry_time = timedelta(0, (30 * 1))  # try to refresh after an hour
+        auto_refresh_time = timedelta(0, (3600 * 24))  # a full day (24 hours of 3600 seconds)
+        failed_refresh_retry_time = timedelta(0, (60 * 5))  # try to refresh after 5 minutes
 
         app_task_data = getattr(self, "task_data", None)
 
         if app_task_data is None:
             try:
-                task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=2)
+                task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=10)
+                # we set timeout to 10 sec if the task data doesn't exist.
+                # It's long to wait for a webpage to load, but sometimes the workers take time to come out of sleep
                 app_task_data = {"task_data": task_data, "refresh_time": datetime.now() + auto_refresh_time}
                 setattr(self, "task_data", app_task_data)
                 logger.warning("Got tasks data for the first time since django server relaunched")
@@ -424,6 +426,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             if refresh:
                 try:
                     task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=2)
+                    # if the data needs to be refreshed, we don't wait for as long as for a first get of infos.
                     app_task_data = {"task_data": task_data, "refresh_time": datetime.now() + auto_refresh_time}
                     logger.warning("Refreshed celery tasks data sucessfully")
                 except Exception as e:
