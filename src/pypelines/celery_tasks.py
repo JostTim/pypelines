@@ -316,8 +316,26 @@ class LogTask:
 
 
 def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery | None":
+
+    failure_message = (
+        f"Celery app : {app_name} failed to be created."
+        "Don't worry, about this alert, "
+        "this is not be an issue if you didn't explicitely planned on using celery. Issue was : "
+    )
+
+    logger = getLogger("pypelines.create_celery_app")
+
+    if app_name in APPLICATIONS_STORE.keys():
+        logger.warning(f"Tried to create a celery app named {app_name}, but it already exists. Returning it instead.")
+        return APPLICATIONS_STORE[app_name]
+
+    try:
+        from celery import Task
+    except ImportError as e:
+        logger.warning(f"{failure_message} Could not import celery app. {e}")
+        return None
+
     from types import MethodType
-    from celery import Task
 
     def get_setting_files_path(conf_path) -> List[Path]:
         conf_path = Path(conf_path)
@@ -479,18 +497,6 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             self, task_name, app_name, session_id, extra=extra, **kwargs
         )
         return task_record
-
-    failure_message = (
-        f"Celery app : {app_name} failed to be created."
-        "Don't worry, about this alert, "
-        "this is not be an issue if you didn't explicitely planned on using celery. Issue was : "
-    )
-
-    logger = getLogger("pypelines.create_celery_app")
-
-    if app_name in APPLICATIONS_STORE.keys():
-        logger.warning(f"Tried to create a celery app named {app_name}, but it already exists. Returning it instead.")
-        return APPLICATIONS_STORE[app_name]
 
     settings_files = get_setting_files_path(conf_path)
 
