@@ -1,2 +1,2 @@
 celery>=5.3.5
-alyx_connector>=0.0.10
+alyx_connector>=2.1.5
