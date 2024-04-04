@@ -508,7 +508,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
     def is_hand_shaken(self):
         try:
-            result = self.tasks[f"{app_name}.handshake"].delay(app_name).get(timeout=1)
+            result = self.tasks[f"{app_name}.handshake"].delay().get(timeout=1)
             logger.warning(f"Handshake result : {result}")
             return True
         except ValueError:
