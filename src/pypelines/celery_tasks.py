@@ -241,9 +241,7 @@ class CeleryTaskRecord(dict):
         app: "Celery", task_model: type, task_name: str, pipeline_name: str, session: object, extra=None, **kwargs
     ):
 
-        new_task = task_model(
-            name=task_name, session=session, arguments=kwargs, status="Waiting", executable=pipeline_name
-        )
+        new_task = task_model(name=task_name, session=session, arguments=kwargs, status=25, executable=pipeline_name)
         new_task.save()
 
         task_dict = new_task.__dict__.copy()
