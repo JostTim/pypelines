@@ -1,9 +1,18 @@
 [build-system]
-requires = ["setuptools >= 66.0"]
-build-backend = "setuptools.build_meta"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [project]
 name = "processing-pypelines"
+dependencies = [
+    "coloredlogs>=15.0.1",
+    "dynaconf>=3.2.4",
+    "natsort>=8.4.0",
+    "networkx>=3.1",
+    "numpy",
+    "matplotlib",
+    "pandas>=2.1.4",
+]
 authors = [
     { name = "Timothé Jost-Mousseau", email = "timothe.jost-mousseau@pasteur.fr" },
 ]
@@ -14,20 +23,16 @@ description = "Framework to organize processing code outputs to/from disk, proce
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+celery = ["celery>=5.3.5", "alyx_connector>=2.1.5"]
 
 [project.urls]
 homepage = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 repository = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 documentation = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
-optional-dependencies = { celery = { file = [
-    "requirements.txt",
-    "requirements-celery.txt",
-] } }
-version = { attr = "pypelines.__version__" }
-
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.pdm.version]
+source = "file"
+path = "src/pypelines/__init__.py"

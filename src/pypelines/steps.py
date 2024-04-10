@@ -42,6 +42,15 @@ def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]
     # It basically just step an "is_step" stamp on the method that are defined as steps.
     # This stamp will later be used in the metaclass __new__ to set additionnal usefull attributes to those methods
     def registrate(function: Callable):
+        """Registers a function as a step in a process.
+
+        Args:
+            function (Callable): The function to be registered as a step.
+
+        Returns:
+            Callable: The registered function with additional attributes such as 'requires', 'is_step', 'version',
+                'do_dispatch', 'step_name', and 'callbacks'.
+        """
         function.requires = [requires] if not isinstance(requires, list) else requires
         function.is_step = True
         function.version = version
@@ -73,6 +82,25 @@ class BaseStep:
         pipe: "BasePipe",
         worker: MethodType,
     ):
+        """Initialize a BaseStep object.
+
+        Args:
+            pipeline (Pipeline): The parent pipeline object.
+            pipe (BasePipe): The parent pipe object.
+            worker (MethodType): The worker method associated with this step.
+
+        Attributes:
+            pipeline (Pipeline): An instance of the parent pipeline.
+            pipe (BasePipe): An instance of the parent pipe.
+            worker (MethodType): An instance of the worker method.
+            do_dispatch: The do_dispatch attribute of the worker method.
+            version: The version attribute of the worker method.
+            requires: The requires attribute of the worker method.
+            step_name: The step_name attribute of the worker method.
+            callbacks: The callbacks attribute of the worker method.
+            multisession: An instance of the multisession class associated with the pipe.
+            task: The task manager created by the runner backend of the pipeline.
+        """
         # save an instanciated access to the pipeline parent
         self.pipeline = pipeline
         # save an instanciated access to the pipe parent
@@ -102,44 +130,61 @@ class BaseStep:
 
     @property
     def requirement_stack(self) -> Callable:
+        """Return a partial function that calls the get_requirement_stack method of the pipeline
+        attribute with the instance set to self.
+        """
         return partial(self.pipeline.get_requirement_stack, instance=self)
 
     @property
     def pipe_name(self) -> str:
+        """Return the name of the pipe."""
         return self.pipe.pipe_name
 
     @property
     def relative_name(self) -> str:
+        """Return the relative name of the object by concatenating the pipe name and step name."""
         return f"{self.pipe_name}.{self.step_name}"
 
     @property
     def pipeline_name(self) -> str:
+        """Return the name of the pipeline."""
         return self.pipe.pipeline.pipeline_name
 
     @property
     def complete_name(self) -> str:
+        """Return the complete name by combining the pipeline name and relative name."""
         return f"{self.pipeline_name}.{self.relative_name}"
 
     def disk_step(self, session, extra=""):
+        """Retrieve the disk object and return the disk step instance."""
         disk_object = self.get_disk_object(session, extra)
         return disk_object.disk_step_instance()
 
     def __call__(self, *args, **kwargs):
+        """Call the worker method with the given arguments and keyword arguments."""
         return self.worker(*args, **kwargs)
 
     def __repr__(self):
+        """Return a string representation of the StepObject in the format: "<pipe_name.step_name StepObject>"."""
         return f"<{self.pipe_name}.{self.step_name} StepObject>"
 
     @property
     def load(self):
+        """Load data using the get_load_wrapped method."""
         return self.get_load_wrapped()
 
     @property
     def save(self):
+        """Save the current state of the object.
+
+        Returns:
+            The saved state of the object.
+        """
         return self.get_save_wrapped()
 
     @property
     def generate(self):
+        """Return the result of calling the get_generate_wrapped method."""
         return self.get_generate_wrapped()
 
     # def make_wrapped_functions(self):
@@ -148,8 +193,31 @@ class BaseStep:
     #     self.generate = self.make_wrapped_generate()
 
     def get_save_wrapped(self):
+        """Returns a wrapped function that saves data using the disk class.
+
+        This function wraps the save method of the disk class with additional functionality.
+
+        Args:
+            session: The session to use for saving the data.
+            data: The data to be saved.
+            extra: Additional information to be used during saving (default is None).
+
+        Returns:
+            The wrapped function that saves the data using the disk class.
+        """
+
         @wraps(self.pipe.disk_class.save)
         def wrapper(session, data, extra=None):
+            """Wrapper function to save data to disk.
+
+            Args:
+                session: The session object.
+                data: The data to be saved.
+                extra: Additional information (default is None).
+
+            Returns:
+                The result of saving the data to disk.
+            """
             if extra is None:
                 extra = self.get_default_extra()
             self.pipeline.resolve()
@@ -161,8 +229,34 @@ class BaseStep:
         return wrapper
 
     def get_load_wrapped(self):
+        """Get a wrapped function for loading disk objects.
+
+        This function wraps the load method of the disk class with the provided session, extra, and strict parameters.
+
+        Args:
+            session: The session to use for loading the disk object.
+            extra: Additional parameters for loading the disk object (default is None).
+            strict: A boolean flag indicating whether to strictly load the disk object (default is False).
+
+        Returns:
+            The wrapped function for loading disk objects.
+        """
+
         @wraps(self.pipe.disk_class.load)
         def wrapper(session, extra=None, strict=False):
+            """Wrapper function to load disk object with session and optional extra parameters.
+
+            Args:
+                session: The session to use for loading the disk object.
+                extra (optional): Extra parameters to be passed for loading the disk object. Defaults to None.
+                strict (bool, optional): Flag to indicate strict loading. Defaults to False.
+
+            Returns:
+                The loaded disk object.
+
+            Raises:
+                ValueError: If the disk object does not match and has a status message.
+            """
             # print("extra in load wrapper : ", extra)
             if extra is None:
                 extra = self.get_default_extra()
@@ -178,6 +272,11 @@ class BaseStep:
         return wrapper
 
     def get_generate_wrapped(self):
+        """Return the wrapped generation mechanism with optional dispatching.
+
+        Returns:
+            The wrapped generation mechanism with optional dispatching.
+        """
         if self.do_dispatch:
             return autoload_arguments(
                 self.pipe.dispatcher(loggedmethod(self.generation_mechanism), "generator"),
@@ -186,16 +285,52 @@ class BaseStep:
         return autoload_arguments(loggedmethod(self.generation_mechanism), self)
 
     def get_level(self, selfish=False) -> int:
+        """Get the level of the step.
+
+        Args:
+            selfish (bool): Whether to calculate the level selfishly. Defaults to False.
+
+        Returns:
+            int: The level of the step.
+        """
         self.pipeline.resolve()
         return StepLevel(self).resolve_level(selfish=selfish)
 
     def get_disk_object(self, session, extra=None):
+        """Return a disk object based on the provided session and optional extra parameters.
+
+        Args:
+            session: The session to use for creating the disk object.
+            extra (optional): Additional parameters to be passed to the disk object. Defaults to None.
+
+        Returns:
+            Disk: A disk object created using the provided session and extra parameters.
+        """
         if extra is None:
             extra = self.get_default_extra()
         return self.pipe.disk_class(session, self, extra)
 
     @property
     def generation_mechanism(self):
+        """Generates a wrapper function for the given worker function with additional functionality such as skipping,
+        refreshing, checking requirements, and saving output to file.
+
+        Args:
+            session: The session object.
+            *args: Positional arguments for the worker function.
+            extra: Additional argument for the worker function (default is None).
+            skip: If True, the step doesn't get loaded if found on the drive (default is False).
+            refresh: If True, the step's value gets refreshed instead of used from a file (default is False).
+            refresh_requirements: If True, refreshes all requirements; if list of strings, refreshes specific
+                steps/pipes (default is False).
+            check_requirements: If True, checks requirements with skip=True (default is False).
+            save_output: If False, doesn't save the output to file after calculation (default is True).
+            **kwargs: Additional keyword arguments for the worker function.
+
+        Returns:
+            The wrapper function with extended functionality.
+        """
+
         @wraps(self.worker)
         def wrapper(
             session,
@@ -435,6 +570,12 @@ class BaseStep:
         return wrapper
 
     def generate_doc(self) -> str:
+        """Generate a new docstring by inserting a chapter about Pipeline Args before the existing
+        docstring of the function.
+        If the existing docstring contains 'Raises' or 'Returns', the new chapter will be inserted before that.
+        If not, it will be inserted at the end of the existing docstring.
+        """
+
         new_doc = ""
         doc = self.worker.__doc__
         if doc is None:
@@ -503,6 +644,11 @@ class BaseStep:
         return param.default
 
     def is_refresh_in_kwargs(self):
+        """Check if the 'refresh' parameter is present in the keyword arguments of the function.
+
+        Returns:
+            bool: True if the 'refresh' parameter is present, False otherwise.
+        """
         sig = inspect.signature(self.worker)
         param = sig.parameters.get("refresh")
         if param is None:
@@ -510,6 +656,19 @@ class BaseStep:
         return True
 
     def load_requirement(self, pipe_name, session, extra=None):
+        """Load the specified requirement step for the given pipe name.
+
+        Args:
+            pipe_name (str): The name of the pipe for which the requirement step needs to be loaded.
+            session: The session to be used for loading the requirement step.
+            extra (optional): Any extra information to be passed while loading the requirement step.
+
+        Returns:
+            The loaded requirement step.
+
+        Raises:
+            IndexError: If the required step with the specified pipe name is not found in the requirement stack.
+        """
         try:
             req_step = [step for step in self.requirement_stack() if step.pipe_name == pipe_name][-1]
         except IndexError as e:
@@ -520,9 +679,27 @@ class BaseStep:
         return req_step.load(session, extra=extra)
 
     def set_arguments(self, session, **arguments):
+        """Set the arguments for the session.
+
+        Args:
+            session: The session to set the arguments for.
+            **arguments: Additional keyword arguments to set.
+
+        Raises:
+            NotImplementedError: This method is not implemented and should be overridden in a subclass.
+        """
         raise NotImplementedError
 
     def get_arguments(self, session):
+        """Get the arguments for the specified session.
+
+        Args:
+            self: The object instance.
+            session: The session for which arguments need to be retrieved.
+
+        Raises:
+            NotImplementedError: This method must be implemented in a subclass.
+        """
         raise NotImplementedError
 
 

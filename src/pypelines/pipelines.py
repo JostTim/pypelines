@@ -15,6 +15,19 @@ class Pipeline:
     runner_backend_class = BaseTaskBackend
 
     def __init__(self, name: str, **runner_args):
+        """Initialize the pipeline with the given name and runner arguments.
+
+        Args:
+            name (str): The name of the pipeline.
+            **runner_args: Additional keyword arguments for the runner backend.
+
+        Attributes:
+            pipeline_name (str): The name of the pipeline.
+            pipes (dict): Dictionary to store pipeline components.
+            resolved (bool): Flag to indicate if the pipeline is resolved.
+            runner_backend: The runner backend object created with the provided arguments.
+                If creation fails, it evaluates to False as a boolean.
+        """
         self.pipeline_name = name
         self.pipes = {}
         self.resolved = False
@@ -25,7 +38,8 @@ class Pipeline:
 
     def register_pipe(self, pipe_class: Type["BasePipe"]) -> Type["BasePipe"]:
         """Wrapper to instanciate and attache a a class inheriting from BasePipe it to the Pipeline instance.
-        The Wraper returns the class without changing it."""
+        The Wraper returns the class without changing it.
+        """
         instance = pipe_class(self)
 
         # attaches the instance itself to the pipeline, and to the dictionnary 'pipes' of the current pipeline
@@ -47,6 +61,17 @@ class Pipeline:
         return pipe_class
 
     def resolve_instance(self, instance_name: str) -> "BaseStep":
+        """Resolve the specified instance name to a BaseStep object.
+
+        Args:
+            instance_name (str): The name of the instance in the format 'pipe_name.step_name'.
+
+        Returns:
+            BaseStep: The BaseStep object corresponding to the instance name.
+
+        Raises:
+            KeyError: If the specified instance name is not found in the pipeline.
+        """
         pipe_name, step_name = instance_name.split(".")
         try:
             pipe = self.pipes[pipe_name]
@@ -139,6 +164,7 @@ class Pipeline:
 
     @property
     def graph(self) -> "PipelineGraph":
+        """Return a PipelineGraph object representing the graph of the pipeline."""
         from .graphs import PipelineGraph
 
         return PipelineGraph(self)

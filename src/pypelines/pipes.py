@@ -29,6 +29,34 @@ class BasePipe(metaclass=ABCMeta):
     steps: Dict[str, BaseStep]
 
     def __init__(self, parent_pipeline: "Pipeline") -> None:
+        """Initialize the Pipeline object with the parent pipeline and set up the steps based on the methods decorated
+        with @stepmethod.
+
+        Args:
+            parent_pipeline (Pipeline): The parent pipeline object.
+
+        Raises:
+            ValueError: If no step class is registered with @stepmethod decorator, or if single_step is set to
+                True with more than one step, or if steps are not linked in hierarchical order.
+
+        Notes:
+            - The step methods must inherit from BaseStep.
+            - The steps should be linked in hierarchical order with `requires` specification for at least N-1 steps
+                in a single pipe.
+
+        Syntaxic sugar:
+            - If the pipe is a single step, accessing any pipe instance in the pipeline can be done by iterating on
+                pipeline.pipes.pipe.
+
+        Attributes:
+            pipeline (Pipeline): The parent pipeline object.
+            pipe_name (str): The name of the pipeline.
+            steps (Dict[str, BaseStep]): Dictionary containing the step objects.
+            pipe: A reference to the pipeline object.
+
+        Returns:
+            None
+        """
         self.pipeline = parent_pipeline
         self.pipe_name = self.__class__.__name__
 
@@ -76,6 +104,11 @@ class BasePipe(metaclass=ABCMeta):
 
     @property
     def version(self):
+        """Return a hash representing the versions of all steps in the object.
+
+        Returns:
+            str: A 7-character hexadecimal hash representing the versions of all steps.
+        """
         versions = []
         for step in self.steps.values():
             versions.append(str(step.version))
@@ -89,6 +122,18 @@ class BasePipe(metaclass=ABCMeta):
         return version_hash
 
     def get_levels(self, selfish=True):
+        """Get the levels of each step in the pipeline.
+
+        Args:
+            selfish (bool, optional): Flag to indicate if the levels should be calculated selfishly. Defaults to True.
+
+        Returns:
+            dict: A dictionary containing the steps as keys and their corresponding levels as values.
+
+        Raises:
+            ValueError: If there are multiple steps with the same level and the saving backend doesn't
+                support multi-step version identification.
+        """
         levels = {}
         for step in self.steps.values():
             levels[step] = step.get_level(selfish=selfish)
@@ -108,6 +153,11 @@ class BasePipe(metaclass=ABCMeta):
         return levels
 
     def __repr__(self) -> str:
+        """Return a string representation of the PipeObject in the format: "<BaseClassName.pipe_name PipeObject>".
+
+        Returns:
+            str: A string representation of the PipeObject.
+        """
         return f"<{self.__class__.__bases__[0].__name__}.{self.pipe_name} PipeObject>"
 
     # @abstractmethod
@@ -117,14 +167,38 @@ class BasePipe(metaclass=ABCMeta):
     #     return None
 
     def dispatcher(self, function: Callable, dispatcher_type):
+        """Dispatches the given function based on the dispatcher type.
+
+        Args:
+            function (Callable): The function to be dispatched.
+            dispatcher_type: The type of dispatcher to be used.
+
+        Returns:
+            Callable: A wrapped function based on the dispatcher type.
+        """
         # the dispatcher must be return a wrapped function
         return function
 
     def pre_run_wrapper(self, function: Callable):
+        """Return a wrapped function by the dispatcher."""
         # the dispatcher must be return a wrapped function
         return function
 
     def load(self, session, extra="", which: Literal["lowest", "highest"] = "highest"):
+        """Load a step object for a session with optional extra data.
+
+        Args:
+            session: The session object to load the step for.
+            extra (str, optional): Additional data to pass to the step object. Defaults to "".
+            which (Literal["lowest", "highest"], optional): Determines whether to load the lowest or highest step.
+                Defaults to "highest".
+
+        Returns:
+            The loaded step object.
+
+        Raises:
+            ValueError: If no matching step object is found for the session.
+        """
         if which == "lowest":
             reverse = False
         else:

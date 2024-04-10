@@ -1,70 +1,73 @@
 import logging
 import sys
 import re
-import os
 from functools import wraps
-import coloredlogs
+from coloredlogs import (
+    coerce_string,
+    ansi_wrap,
+    Empty,
+    ColoredFormatter,
+    UserNameFilter,
+    ProgramNameFilter,
+    HostNameFilter,
+)
+from pathlib import Path
 
-NAMELENGTH = 33  # global variable for fromatting the length of the padding dedicated to name part in a logging record
-LEVELLENGTH = 8  # global variable for fromatting the length of the padding dedicated to levelname part in a record
+NAMELENGTH = 33  # global variable for formatting the length of the padding dedicated to name part in a logging record
+LEVELLENGTH = 8  # global variable for formatting the length of the padding dedicated to levelname part in a record
 
 
-def enable_logging(terminal_level="NOTE", file_level="LOAD", programname="", username=""):
-    """_summary_
+def enable_logging(
+    filename: str | None = None,
+    terminal_level: str = "NOTE",
+    file_level: str = "LOAD",
+    programname: str = "",
+    username: str = "",
+):
+    """Enable logging with specified configurations.
 
     Args:
-        terminal_level (str, optional): _description_. Defaults to "INFO".
-        file_level (str, optional): _description_. Defaults to "LOAD".
-        programname (str, optional): _description_. Defaults to "".
-        username (str, optional): _description_. Defaults to "".
+        filename (str, optional): Path to the log file. Defaults to None.
+        terminal_level (str, optional): Logging level for terminal output. Defaults to "INFO".
+        file_level (str, optional): Logging level for file output. Defaults to "LOAD".
+        programname (str, optional): Name of the program. Defaults to "".
+        username (str, optional): Username for logging. Defaults to "".
     """
     # Create a filehandler object for file
-    fh = logging.FileHandler("test.log", "w", "utf-8")
+    if filename is None:
+        logs_folder = Path.home() / ".python" / "pypelines_logs"
+        logs_folder.mkdir(parents=True, exist_ok=True)
+        filename = str(logs_folder / "logs.log")
+
+    fh = logging.FileHandler(filename, mode="a", encoding="utf-8")
     f_formater = FileFormatter()
     fh.setFormatter(f_formater)
-
-    coloredlogs.HostNameFilter.install(
-        fmt=f_formater.FORMAT,
-        handler=fh,
-        style=f_formater.STYLE,
-        use_chroot=True,
-    )
-    coloredlogs.ProgramNameFilter.install(
-        fmt=f_formater.FORMAT,
-        handler=fh,
-        programname=programname,
-        style=f_formater.STYLE,
-    )
-    coloredlogs.UserNameFilter.install(
-        fmt=f_formater.FORMAT,
-        handler=fh,
-        username=username,
-        style=f_formater.STYLE,
-    )
 
     # Create a filehandler object for terminal
     ch = logging.StreamHandler(sys.stdout)
     c_formater = TerminalFormatter()
     ch.setFormatter(c_formater)
 
-    coloredlogs.HostNameFilter.install(
-        fmt=c_formater.FORMAT,
-        handler=fh,
-        style=c_formater.STYLE,
-        use_chroot=True,
-    )
-    coloredlogs.ProgramNameFilter.install(
-        fmt=c_formater.FORMAT,
-        handler=fh,
-        programname=programname,
-        style=c_formater.STYLE,
-    )
-    coloredlogs.UserNameFilter.install(
-        fmt=c_formater.FORMAT,
-        handler=fh,
-        username=username,
-        style=c_formater.STYLE,
-    )
+    for handler, formater in zip([fh, ch], [f_formater, c_formater]):
+
+        HostNameFilter.install(
+            fmt=formater.FORMAT,
+            handler=handler,
+            style=f_formater.STYLE,
+            use_chroot=True,
+        )
+        ProgramNameFilter.install(
+            fmt=formater.FORMAT,
+            handler=handler,
+            programname=programname,
+            style=formater.STYLE,
+        )
+        UserNameFilter.install(
+            fmt=formater.FORMAT,
+            handler=handler,
+            username=username,
+            style=formater.STYLE,
+        )
 
     logger = logging.getLogger()  # root logger
 
@@ -84,13 +87,13 @@ def enable_logging(terminal_level="NOTE", file_level="LOAD", programname="", use
         min(terminal_level, file_level)
     )  # set logger level to the lowest usefull, to be sure we can capture messages necessary in handlers
 
-    fh.setLevel(file_level)
-    logger.addHandler(fh)
-    ch.setLevel(terminal_level)
-    logger.addHandler(ch)
+    for handler in [fh, ch]:
+
+        handler.setLevel(file_level)
+        logger.addHandler(handler)
 
 
-class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
+class DynamicColoredFormatter(ColoredFormatter):
     """_summary_"""
 
     # note that only message, name, levelname, pathname, process, thread, lineno, levelno and filename can be dynamic.
@@ -98,15 +101,15 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
     # as it would be more complex to implement otherwise, and for a small benefit.
 
     def __init__(self, fmt=None, datefmt=None, style="%", level_styles=None, field_styles=None, dynamic_levels=None):
-        """_summary_
+        """Initialize the logging formatter with custom formatting options.
 
         Args:
-            fmt (_type_, optional): _description_. Defaults to None.
-            datefmt (_type_, optional): _description_. Defaults to None.
-            style (str, optional): _description_. Defaults to "%".
-            level_styles (_type_, optional): _description_. Defaults to None.
-            field_styles (_type_, optional): _description_. Defaults to None.
-            dynamic_levels (_type_, optional): _description_. Defaults to None.
+            fmt (str, optional): A format string for the log message. Defaults to None.
+            datefmt (str, optional): A format string for the date/time portion of the log message. Defaults to None.
+            style (str, optional): The style of formatting to use. Defaults to "%".
+            level_styles (dict, optional): A dictionary mapping log levels to custom styles. Defaults to None.
+            field_styles (dict, optional): A dictionary mapping log fields to custom styles. Defaults to None.
+            dynamic_levels (dict, optional): A dictionary mapping dynamic log levels. Defaults to None.
         """
         self.dynamic_levels = dynamic_levels
         self.lenght_pre_formaters = self.get_length_pre_formaters(fmt)
@@ -119,13 +122,13 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         )
 
     def get_length_pre_formaters(self, fmt):
-        """_summary_
+        """Get the length of pre-formatters in the given format string.
 
         Args:
-            fmt (_type_): _description_
+            fmt (str): The format string containing pre-formatters.
 
         Returns:
-            _type_: _description_
+            dict: A dictionary containing the length of each pre-formatter.
         """
         pattern = r"%\((?P<part_name>\w+)\)-?(?P<length>\d+)?[sd]?"
         result = re.findall(pattern, fmt)
@@ -134,21 +137,21 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
         return padding_dict
 
     def format(self, record: logging.LogRecord):
-        """_summary_
+        """Format the log record for display.
 
         Args:
-            record (_type_): _description_
+            record (logging.LogRecord): The log record to be formatted.
 
         Returns:
-            _type_: _description_
+            str: The formatted log message.
         """
         style = self.nn.get(self.level_styles, record.levelname)
         # print(repr(humanfriendly.terminal.ansi_style(**style)))
         record.message = record.getMessage()
         if self.usesTime():
             record.asctime = self.formatTime(record, self.datefmt)
-        if style and coloredlogs.Empty is not None:
-            copy = coloredlogs.Empty()
+        if style and Empty is not None:
+            copy = Empty()
             copy.__class__ = record.__class__
             copy.__dict__.update(record.__dict__)
             for part_name, length in self.lenght_pre_formaters.items():
@@ -159,7 +162,7 @@ class DynamicColoredFormatter(coloredlogs.ColoredFormatter):
                 if part_name in self.dynamic_levels.keys():
                     dyn_keys = self.dynamic_levels[part_name]
                     dynamic_style = {k: v for k, v in style.items() if k in dyn_keys or dyn_keys == "all"}
-                    part = coloredlogs.ansi_wrap(coloredlogs.coerce_string(part), **dynamic_style)
+                    part = ansi_wrap(coerce_string(part), **dynamic_style)
                 part = part + (" " * missing_length)
                 setattr(copy, part_name, part)
             record = copy  # type: ignore
@@ -211,6 +214,19 @@ class SugarColoredFormatter(DynamicColoredFormatter):
     }
 
     def __init__(self, fmt=None, datefmt=None, style=None, level_styles=None, field_styles=None, dynamic_levels=None):
+        """Initializes a custom logging formatter with specified parameters.
+
+        Args:
+            fmt (str): The log message format string.
+            datefmt (str): The date format string.
+            style (str): The log message style.
+            level_styles (dict): Dictionary mapping log levels to custom styles.
+            field_styles (dict): Dictionary mapping log fields to custom styles.
+            dynamic_levels (bool): Flag indicating whether dynamic levels are enabled.
+
+        Returns:
+            None
+        """
         self.STYLE = style if style is not None else self.STYLE
         self.FORMAT = fmt if fmt is not None else self.FORMAT
         self.DATE_FORMAT = datefmt if datefmt is not None else self.DATE_FORMAT
@@ -367,6 +383,17 @@ def loggedmethod(func):
 
 
 def add_all_custom_headers():
+    """Adds custom logging levels to the logging module.
+
+    This function adds custom logging levels "NOTE", "LOAD", "SAVE", "HEADER", "START",
+    and "END" to the logging module with specific integer values relative to existing levels.
+
+    Example:
+        add_all_custom_headers()
+
+    Note:
+        This function should be called before using the custom logging levels in the application.
+    """
     addLoggingLevel("NOTE", logging.INFO - 1, if_exists="keep")
     addLoggingLevel("LOAD", logging.DEBUG + 1, if_exists="keep")
     addLoggingLevel("SAVE", logging.DEBUG + 2, if_exists="keep")

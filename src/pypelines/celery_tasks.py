@@ -25,11 +25,31 @@ class CeleryAlyxTaskManager(BaseStepTaskManager):
     step: "BaseStep"
 
     def register_step(self):
+        """Register a step in the backend.
+
+        This method registers a task in the backend using the runner obtained from get_runner() method.
+
+        Returns:
+            None
+        """
         if self.backend:
             # self.backend.app.task(CeleryRunner, name=self.step.complete_name)
             self.backend.app.register_task(self.get_runner())
 
     def start(self, session, extra=None, **kwargs):
+        """Starts a task on a celery cluster.
+
+        Args:
+            session: The session to use for the task.
+            extra: Extra information to pass to the task (default is None).
+            **kwargs: Additional keyword arguments to pass to the task.
+
+        Raises:
+            NotImplementedError: If the pipeline does not have a working celery backend.
+
+        Returns:
+            The created CeleryTaskRecord.
+        """
 
         if not self.backend:
             raise NotImplementedError(
@@ -39,6 +59,17 @@ class CeleryAlyxTaskManager(BaseStepTaskManager):
         return CeleryTaskRecord.create(self, session, extra, **kwargs)
 
     def get_runner(superself):  # type: ignore
+        """Return a CeleryRunner task for executing a step in a pipeline.
+
+        Args:
+            superself: The parent object that contains the step information.
+
+        Returns:
+            CeleryRunner: A Celery Task object that runs the specified step.
+
+        Raises:
+            Any exceptions that occur during the execution of the task.
+        """
         from celery import Task
 
         class CeleryRunner(Task):
@@ -87,6 +118,15 @@ class CeleryTaskRecord(dict):
 
     # a class to make dictionnary keys accessible with attribute syntax
     def __init__(self, task_id, task_infos_dict={}, response_handle=None, session=None):
+        """Initialize the Task object.
+
+        Args:
+            task_id (str): The unique identifier for the task.
+            task_infos_dict (dict, optional): A dictionary containing information about the task.
+                If not provided, it will be fetched using the task_id. Defaults to {}.
+            response_handle (Any, optional): A handle for the response. Defaults to None.
+            session (Any, optional): A session object. Defaults to None.
+        """
 
         if not task_infos_dict:
             from one import ONE
@@ -99,6 +139,14 @@ class CeleryTaskRecord(dict):
         self.response = response_handle
 
     def status_from_logs(self, log_object):
+        """Update the status based on the content of the log file.
+
+        Args:
+            log_object: Log object containing the full path to the log file.
+
+        Returns:
+            None
+        """
         with open(log_object.fullpath, "r") as f:
             content = f.read()
 
@@ -116,12 +164,25 @@ class CeleryTaskRecord(dict):
         self["status"] = status
 
     def partial_update(self):
+        """Partially updates a task using the ONE API.
+
+        This function connects to the ONE database in remote mode and performs a partial update on a task
+        using the export data from the current instance.
+
+        Returns:
+            None
+        """
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
         connector.alyx.rest("tasks", "partial_update", **self.export())
 
     def get_session(self):
+        """Retrieve the session object associated with the current instance.
+
+        Returns:
+            The session object.
+        """
         if self.session is None:
             from one import ONE
 
@@ -132,6 +193,14 @@ class CeleryTaskRecord(dict):
         return self.session
 
     def get_application(self):
+        """Return the application associated with the executable stored in the instance.
+
+        Returns:
+            str: The application associated with the executable.
+
+        Raises:
+            KeyError: If the application associated with the executable is not found in the APPLICATIONS_STORE.
+        """
         try:
             return APPLICATIONS_STORE[self["executable"]]
         except KeyError:
@@ -139,18 +208,30 @@ class CeleryTaskRecord(dict):
 
     @property
     def pipeline_name(self):
+        """Return the name of the pipeline by splitting the name attribute at '.' and returning the first part."""
         return self["name"].split(".")[0]
 
     @property
     def pipe_name(self):
+        """Return the name of the pipe by splitting the name attribute using '.' and returning the second element.
+
+        Returns:
+            str: The name of the pipe.
+        """
         return self["name"].split(".")[1]
 
     @property
     def step_name(self):
+        """Return the third element after splitting the 'name' attribute of the object with '.'."""
         return self["name"].split(".")[2]
 
     @property
     def arguments(self):
+        """Retrieve and filter arguments for the current step.
+
+        Returns:
+            dict: Filtered arguments for the current step.
+        """
         # once step arguments control will be done via file, these should take prio over the main step ran's file args
         args = self.get("arguments", {})
         args = args if args else {}
@@ -163,6 +244,16 @@ class CeleryTaskRecord(dict):
 
     @property
     def management_arguments(self):
+        """Returns a dictionary of management arguments based on the default values and any provided arguments.
+
+        Returns:
+            dict: A dictionary containing the management arguments with keys:
+                - "skip": A boolean indicating whether to skip management.
+                - "refresh": A boolean indicating whether to refresh.
+                - "refresh_requirements": A boolean indicating whether to refresh requirements.
+                - "check_requirements": A boolean indicating whether to check requirements.
+                - "save_output": A boolean indicating whether to save output.
+        """
         default_management_args = {
             "skip": True,
             "refresh": False,
@@ -182,17 +273,35 @@ class CeleryTaskRecord(dict):
 
     @property
     def session_path(self) -> str:
+        """Returns the path of the session."""
         return self.session["path"]
 
     @property
     def task_id(self):
+        """Return the task ID."""
         return self["id"]
 
     def export(self):
+        """Export the object as a dictionary with specific keys removed.
+
+        Returns:
+            dict: A dictionary containing the object's id and data with certain keys removed.
+        """
         return {"id": self["id"], "data": {k: v for k, v in self.items() if k not in ["id", "session_path"]}}
 
     @staticmethod
     def create(task_manager: CeleryAlyxTaskManager, session, extra=None, **kwargs):
+        """Creates a new task using the given CeleryAlyxTaskManager and session.
+
+        Args:
+            task_manager (CeleryAlyxTaskManager): The CeleryAlyxTaskManager instance to use.
+            session: The session to associate with the task.
+            extra (optional): Any extra information to include in the task.
+            **kwargs: Additional keyword arguments to pass to the task.
+
+        Returns:
+            CeleryTaskRecord: A CeleryTaskRecord object representing the created task.
+        """
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
@@ -216,6 +325,19 @@ class CeleryTaskRecord(dict):
 
     @staticmethod
     def create_from_task_name(app: "Celery", task_name: str, pipeline_name: str, session, extra=None, **kwargs):
+        """Create a new task from the given task name and pipeline name.
+
+        Args:
+            app (Celery): The Celery application.
+            task_name (str): The name of the task to be created.
+            pipeline_name (str): The name of the pipeline.
+            session: The session object.
+            extra (optional): Extra information for the task.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            CeleryTaskRecord: A record of the created Celery task.
+        """
         from one import ONE
 
         connector = ONE(mode="remote", data_access_mode="remote")
@@ -240,6 +362,21 @@ class CeleryTaskRecord(dict):
     def create_from_model(
         app: "Celery", task_model: type, task_name: str, pipeline_name: str, session: object, extra=None, **kwargs
     ):
+        """Create a new task from a given task model and send it to a Celery app.
+
+        Args:
+            app (Celery): The Celery app instance.
+            task_model (type): The task model class to create a new task instance.
+            task_name (str): The name of the task.
+            pipeline_name (str): The name of the pipeline.
+            session (object): The session object.
+            extra (optional): Extra information to pass to the task.
+            **kwargs: Additional keyword arguments to pass to the task.
+
+        Returns:
+            CeleryTaskRecord: A record of the created task with task ID, task information dictionary,
+                response handle, and session.
+        """
 
         new_task = task_model(name=task_name, session=session, arguments=kwargs, status=25, executable=pipeline_name)
         new_task.save()
@@ -259,6 +396,17 @@ class CeleryTaskBackend(BaseTaskBackend):
     task_manager_class = CeleryAlyxTaskManager
 
     def __init__(self, parent: Pipeline, app: "Celery | None" = None):
+        """Initialize the PipelineApp object.
+
+        Args:
+            parent (Pipeline): The parent Pipeline object.
+            app (str): The Celery app associated with the Pipeline, or None if not provided.
+
+        Attributes:
+            parent (Pipeline): The parent Pipeline object.
+            success (bool): Flag indicating if the initialization was successful.
+            app (str): The Celery app associated with the Pipeline.
+        """
         super().__init__(parent)
         self.parent = parent
 
@@ -271,9 +419,18 @@ class CeleryTaskBackend(BaseTaskBackend):
             self.app.pipelines = pipelines
 
     def start(self):
+        """Starts the application."""
         self.app.start()
 
     def create_task_manager(self, step):
+        """Create a task manager for the given step.
+
+        Args:
+            step: The step to be associated with the task manager.
+
+        Returns:
+            Task manager object initialized with the given step.
+        """
         task_manager = self.task_manager_class(step, self)
         task_manager.register_step()
         return task_manager
@@ -285,6 +442,13 @@ class CeleryPipeline(Pipeline):
 
 class LogTask:
     def __init__(self, task_record: CeleryTaskRecord, username=None, level="LOAD"):
+        """Initialize the TaskLogger object.
+
+        Args:
+            task_record (CeleryTaskRecord): The Celery task record.
+            username (str, optional): The username associated with the task. Defaults to None.
+            level (str, optional): The logging level for the task. Defaults to "LOAD".
+        """
         self.path = Path(task_record.session_path) / "logs"
         self.username = username if username is not None else (node() if node() else "unknown")
         self.worker_pk = task_record.task_id
@@ -292,15 +456,36 @@ class LogTask:
         self.level = getattr(logging, level.upper())
 
     def __enter__(self):
+        """Perform necessary setup tasks when entering a context manager.
+
+        Returns:
+            self: The current instance of the context manager.
+        """
         self.path.mkdir(exist_ok=True)
         self.logger = getLogger()
         self.set_handler()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Clean up resources when exiting a context manager.
+
+        Args:
+            exc_type: The type of the exception that caused the exit, or None if no exception occurred.
+            exc_val: The exception instance that caused the exit, or None if no exception occurred.
+            exc_tb: The traceback of the exception that caused the exit, or None if no exception occurred.
+        """
         self.remove_handler()
 
     def set_handler(self):
+        """Set up logging handler for the current task.
+
+        This method sets up a logging handler for the current task by creating a log file
+        with a specific filename based on task details.
+        It then configures the file handler with appropriate formatters and filters for colored logging.
+
+        Returns:
+            None
+        """
         self.filename = f"task_log.{self.task_name}.{self.worker_pk}.log"
         self.fullpath = self.path / self.filename
         fh = logging.FileHandler(self.fullpath)
@@ -329,10 +514,22 @@ class LogTask:
         self.logger.addHandler(fh)
 
     def remove_handler(self):
+        """Removes the last handler from the logger."""
         self.logger.removeHandler(self.logger.handlers[-1])
 
 
 def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery | None":
+    """Create a Celery app with the given configuration.
+
+    Args:
+        conf_path (str): The path to the configuration file.
+        app_name (str): The name of the Celery app. Default is "pypelines".
+        v_host (str): The virtual host for the Celery app.
+
+    Returns:
+        Celery | None: The created Celery app instance or None if creation failed.
+
+    """
 
     failure_message = (
         f"Celery app : {app_name} failed to be created."
@@ -355,6 +552,14 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     from types import MethodType
 
     def get_setting_files_path(conf_path) -> List[Path]:
+        """Get the paths of setting files for the given configuration path.
+
+        Args:
+            conf_path (str): The path to the configuration file.
+
+        Returns:
+            List[Path]: A list of Path objects representing the setting files found.
+        """
         conf_path = Path(conf_path)
         if conf_path.is_file():
             conf_path = conf_path.parent
@@ -366,12 +571,28 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return files
 
     def get_signature_as_string(signature):
+        """Return the function signature as a string without the 'session' parameter.
+
+        Args:
+            signature: The signature of the function.
+
+        Returns:
+            str: The function signature as a string without the 'session' parameter.
+        """
         params = [
             param_value for param_name, param_value in signature.parameters.items() if param_name not in ["session"]
         ]
         return str(signature.replace(parameters=params))[1:-1].replace(" *,", "")
 
     def get_type_name(annotation):
+        """Returns the name of the type hint for a given annotation.
+
+        Args:
+            annotation: The annotation for which to determine the type name.
+
+        Returns:
+            str: The name of the type hint.
+        """
         from inspect import Parameter
         from typing import get_args, get_origin
         from types import UnionType
@@ -394,6 +615,17 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return "__unknown__"
 
     def string_to_typehint(string_hint, globalns=None, localns=None):
+        """Converts a string type hint to a valid type hint object.
+
+        Args:
+            string_hint (str): The string representation of the type hint.
+            globalns (dict, optional): Global namespace dictionary. Defaults to None.
+            localns (dict, optional): Local namespace dictionary. Defaults to None.
+
+        Returns:
+            type: The type hint object corresponding to the input string hint,
+                or "__unknown__" if the type hint is not valid.
+        """
         from typing import ForwardRef, _eval_type
 
         try:
@@ -402,6 +634,18 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             return "__unknown__"
 
     def get_signature_as_dict(signature):
+        """Return a dictionary containing information about the parameters of a function signature.
+
+        Args:
+            signature: A function signature object.
+
+        Returns:
+            dict: A dictionary where keys are parameter names and values
+                are dictionaries containing the following information:
+                - "typehint": The type hint of the parameter.
+                - "default_value": The default value of the parameter (or "__empty__" if no default value is specified).
+                - "kind": The kind of the parameter (e.g., POSITIONAL_ONLY, KEYWORD_ONLY, etc.).
+        """
         from inspect import Parameter
 
         parameters = signature.parameters
@@ -426,6 +670,15 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         name = f"{app_name}.tasks_infos"
 
         def run(self, app_name, selfish=False):
+            """Run the specified app to gather tasks information.
+
+            Args:
+                app_name (str): The name of the app to run.
+                selfish (bool, optional): Flag to indicate whether to include selfish tasks. Defaults to False.
+
+            Returns:
+                dict: A dictionary containing tasks information for the specified app.
+            """
             app = APPLICATIONS_STORE[app_name]
             tasks_dynamic_data = {}
             pipelines = getattr(app, "pipelines", {})
@@ -457,6 +710,11 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             return tasks_dynamic_data
 
     def get_remote_tasks(self):
+        """Retrieve information about remote tasks.
+
+        Returns:
+            dict: A dictionary containing information about remote tasks, including workers and task names.
+        """
         registered_tasks = self.control.inspect().registered_tasks()
         workers = []
         task_names = []
@@ -471,6 +729,19 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     def get_celery_app_tasks(
         self, refresh=False, auto_refresh=3600 * 24, failed_refresh=60 * 5, initial_timeout=10, refresh_timeout=2
     ):
+        """Get the celery app tasks data with optional refresh mechanism.
+
+        Args:
+            refresh (bool): Flag to force refresh the tasks data. Default is False.
+            auto_refresh (int): Time interval in seconds for auto refresh. Default is 3600 seconds (1 hour).
+            failed_refresh (int): Time interval in seconds for retrying refresh after failure.
+                Default is 300 seconds (5 minutes).
+            initial_timeout (int): Timeout in seconds for initial task data retrieval. Default is 10 seconds.
+            refresh_timeout (int): Timeout in seconds for refreshing task data. Default is 2 seconds.
+
+        Returns:
+            dict: The task data of the celery app if available, otherwise None.
+        """
 
         from datetime import datetime, timedelta
 
@@ -520,6 +791,18 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return app_task_data["task_data"] if app_task_data is not None else None
 
     def launch_named_task_remotely(self, session_id, task_name, task_model=None, extra=None, kwargs={}):
+        """Launches a named task remotely.
+
+        Args:
+            session_id (str): The session ID for the task.
+            task_name (str): The name of the task to be launched.
+            task_model (object, optional): The task model object. Defaults to None.
+            extra (dict, optional): Extra data to be passed to the task. Defaults to None.
+            kwargs (dict, optional): Additional keyword arguments to be passed to the task. Defaults to {}.
+
+        Returns:
+            CeleryTaskRecord: The task record created for the launched task.
+        """
 
         if task_model is None:
             task_record = CeleryTaskRecord.create_from_task_name(
@@ -533,6 +816,11 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return task_record
 
     def is_hand_shaken(self):
+        """Check if a handshake is successful.
+
+        Returns:
+            bool: True if handshake is successful, False otherwise.
+        """
         try:
             result = self.tasks[f"{app_name}.handshake"].delay().get(timeout=1)
             logger.warning(f"Handshake result : {result}")

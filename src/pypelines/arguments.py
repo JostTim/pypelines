@@ -25,6 +25,19 @@ def read_json_file(json_file: str):
 
 
 def read_session_arguments_file(session, step, file_suffix="_arguments.json"):
+    """Reads the arguments file for a specific session and step.
+
+    Args:
+        session: The session object containing the path information.
+        step: The step object for which the arguments file needs to be read.
+        file_suffix: The suffix to be appended to the arguments file name (default is "_arguments.json").
+
+    Returns:
+        The contents of the arguments file as a dictionary.
+
+    Raises:
+        FileNotFoundError: If the arguments file for the specified session and step is not found.
+    """
     file_name = step.pipeline.pipeline_name + file_suffix
     try:
         path = os.path.join(session.path, file_name)
@@ -46,7 +59,18 @@ def autoload_arguments(wrapped_function, step):
     """
 
     @wraps(wrapped_function)
-    def wraper(session, *args, **kwargs):
+    def wrapper(session, *args, **kwargs):
+        """Wrapper function that automatically loads arguments from pipelines_arguments.json
+        and overrides them with current call arguments.
+
+        Args:
+            session: The session object.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The result of the wrapped function with updated arguments.
+        """
         local_log = getLogger("autoload_arguments")
 
         config_kwargs = get_step_arguments(session, step)
@@ -70,10 +94,24 @@ def autoload_arguments(wrapped_function, step):
         config_kwargs.update(kwargs)
         return wrapped_function(session, *args, **config_kwargs)
 
-    return wraper
+    return wrapper
 
 
 def get_step_arguments(session, step):
+    """Get the arguments for a specific step from the session's arguments file.
+
+    Args:
+        session (str): The name of the session.
+        step (Step): The step object for which arguments need to be retrieved.
+
+    Returns:
+        dict: The arguments for the specified step.
+
+    Raises:
+        FileNotFoundError: If the session arguments file is not found.
+        KeyError: If the 'functions' key or the key corresponding to step.relative_name
+            is not found in the arguments file.
+    """
     local_log = getLogger("autoload_arguments")
 
     try:

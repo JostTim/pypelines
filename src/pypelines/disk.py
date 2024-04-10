@@ -28,6 +28,22 @@ class BaseDiskObject(metaclass=ABCMeta):
     extra: str
 
     def __init__(self, session: Session, step: "BaseStep", extra="") -> None:
+        """Initialize the ShortLivedObject with the given session, step, and optional extra data.
+
+        Args:
+            session (Session): The session object to use.
+            step (BaseStep): The step object to use.
+            extra (str, optional): Extra data to include. Defaults to "".
+
+        Returns:
+            None
+
+        Notes:
+            This object is meant to be short lived. Created, check drive,
+            and quickly take action by saving or loading file according to the procedures defined.
+            The behavior is not meant to be edited after the init so that's why the methods
+            don't take arguments, at the exception of the save method which takes data to save as input.
+        """
         # this object is meant to be short lived. Created, check drive,
         # and quickly take action by saving or loading file according to the procedures defined.
         # The behaviour is not meant to be edited after the init so that's why the methods
@@ -41,14 +57,21 @@ class BaseDiskObject(metaclass=ABCMeta):
 
     @property
     def object_name(self):
+        """Return the full name of the object."""
         return f"{self.step.relative_name}{'.' + self.extra if self.extra else ''}"
 
     @abstractmethod
     def version_deprecated(self) -> bool:
+        """Returns a boolean value indicating whether the version is deprecated."""
         return False
 
     @abstractmethod
     def step_level_too_low(self) -> bool:
+        """Check if the step level is too low.
+
+        Returns:
+            bool: True if the step level is too low, False otherwise.
+        """
         return False
 
     @abstractmethod
@@ -78,6 +101,15 @@ class BaseDiskObject(metaclass=ABCMeta):
 
     @staticmethod
     def multisession_packer(sessions, session_result_dict: dict) -> dict:
+        """Packs the results of multiple sessions into a dictionary with session u_alias as keys.
+
+        Args:
+            sessions: DataFrame containing session information.
+            session_result_dict: Dictionary containing session results with session id as keys.
+
+        Returns:
+            Dictionary with session u_alias as keys and corresponding results as values.
+        """
         session_result_dict = {
             sessions.loc[key].u_alias: value for key, value in session_result_dict.items()
         }  # replace indices from session id with session u_alias
@@ -86,6 +118,15 @@ class BaseDiskObject(metaclass=ABCMeta):
 
     @staticmethod
     def multisession_unpacker(sessions, datas):
+        """Unpacks data from multiple sessions.
+
+        Args:
+            sessions (list): A list of session identifiers.
+            datas (list): A list of data corresponding to each session.
+
+        Raises:
+            NotImplementedError: This function is not implemented yet.
+        """
         raise NotImplementedError
 
     def disk_step_instance(self) -> "BaseStep | None":
@@ -95,17 +136,38 @@ class BaseDiskObject(metaclass=ABCMeta):
         return None
 
     def is_matching(self):
+        """Check if the object is matching the required criteria.
+
+        Returns:
+            bool: True if the object is matching, False otherwise.
+        """
         if self.is_loadable() and not (self.version_deprecated() or self.step_level_too_low()):
             return True
         return False
 
     def is_loadable(self) -> bool:
+        """Check if the object is loadable.
+
+        Returns:
+            bool: True if the object is loadable, False otherwise.
+        """
         return self.loadable
 
     def get_found_disk_object_description(self) -> str:
+        """Return the description of the found disk object.
+
+        Returns:
+            str: The description of the found disk object.
+        """
         return ""
 
     def get_status_message(self):
+        """Return a status message for the object.
+
+        Returns:
+            str: A message describing the status of the object, including loadability, deprecation, step level,
+                and found disk object description.
+        """
         loadable_disk_message = "A disk object is loadable. " if self.is_loadable() else ""
         deprecated_disk_message = (
             f"This object's version is {'deprecated' if self.version_deprecated() else 'the current one'}. "
@@ -134,19 +196,50 @@ class BaseDiskObject(metaclass=ABCMeta):
 
 class NullDiskObject(BaseDiskObject):
     def version_deprecated(self) -> bool:
+        """Indicates that the version of the function is deprecated.
+
+        Returns:
+            bool: True if the version is deprecated, False otherwise.
+        """
         return True
 
     def step_level_too_low(self) -> bool:
+        """Check if the step level is too low.
+
+        Returns:
+            bool: True if the step level is too low, False otherwise.
+        """
         return True
 
     def check_disk(self) -> bool:
+        """Check the disk status.
+
+        Returns:
+            bool: True if disk is healthy, False otherwise.
+        """
         return False
 
     def save(self, data: OutputData) -> None:
+        """Save the output data to disk.
+
+        Args:
+            data (OutputData): The output data to be saved.
+
+        Returns:
+            None
+        """
         # data is not saved to disk
         pass
 
     def load(self) -> OutputData:
+        """Load the output data.
+
+        Returns:
+            OutputData: The output data object.
+
+        Raises:
+            NotImplementedError: This should never be called as check_disk always returns False.
+        """
         # this should never be called as check_disk always return False
         raise NotImplementedError
 
@@ -156,6 +249,16 @@ _CACHE_STORAGE = {}  # this cache variable is cross instances
 
 class CachedDiskObject(BaseDiskObject):
     def __init__(self, session: Session, step: "BaseStep", extra="") -> None:
+        """Initialize the BaseStepLoader.
+
+        Args:
+            session (Session): The session object.
+            step (BaseStep): The BaseStep object.
+            extra (str, optional): Extra information. Defaults to "".
+
+        Returns:
+            None
+        """
         self.session = session
         self.step = step
         self.extra = extra
@@ -163,6 +266,11 @@ class CachedDiskObject(BaseDiskObject):
         self.loadable = self.check_disk()
 
     def get_cached_storage(self):
+        """Return cached storage for the current step, session, and extra data.
+
+        Returns:
+            dict: A dictionary containing the cached storage for the current step, session, and extra data.
+        """
         if self.step.pipe not in self.storage:
             self.storage[self.step.pipe] = {}
 
@@ -177,9 +285,18 @@ class CachedDiskObject(BaseDiskObject):
         return stored_dict
 
     def load(self):
+        """Load the content from the cached storage."""
         return self.get_cached_storage()["content"]
 
     def save(self, data):
+        """Save the data into the storage dictionary.
+
+        Args:
+            data: The data to be saved.
+
+        Returns:
+            dict: A dictionary containing the version, content, and step name of the saved data.
+        """
         stored_dict = {
             "version": self.step.version,
             "content": data,
@@ -189,6 +306,7 @@ class CachedDiskObject(BaseDiskObject):
         return stored_dict
 
     def check_disk(self):
+        """Check the disk status and return True if the disk content is not None, otherwise return False."""
         stored_cache = self.get_cached_storage()
         self.disk_version = stored_cache["version"]
         self.disk_step = stored_cache["step"]
@@ -199,11 +317,21 @@ class CachedDiskObject(BaseDiskObject):
         return True
 
     def version_deprecated(self):
+        """Check if the version is deprecated.
+
+        Returns:
+            bool: True if the version is deprecated, False otherwise.
+        """
         if self.step.version != self.disk_version:
             return True
         return False
 
     def step_level_too_low(self) -> bool:
+        """Check if the level of the disk step is lower than the current step.
+
+        Returns:
+            bool: True if the level of the disk step is lower than the current step, False otherwise.
+        """
         # we get the step instance that corresponds to the one on the disk
         disk_step = self.disk_step_instance()
 
@@ -214,5 +342,6 @@ class CachedDiskObject(BaseDiskObject):
         return False
 
     def clear_cache(self):
+        """Clears the cache by removing all items stored in the cache."""
         for pipe in list(self.storage.keys()):
             self.storage.pop(pipe)

@@ -1,2 +1,0 @@
-celery>=5.3.5
-alyx_connector>=2.1.5

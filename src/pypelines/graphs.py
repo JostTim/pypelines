@@ -1,6 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,6 +9,14 @@ class PipelineGraph:
     name_graph: "DiGraph"
 
     def __init__(self, pipeline):
+        """Initialize the PipelineVisualizer object.
+
+        Args:
+            pipeline: The pipeline object to visualize.
+
+        Returns:
+            None
+        """
         from networkx import DiGraph, draw, spring_layout, draw_networkx_labels
 
         self.pipeline = pipeline
@@ -25,6 +30,15 @@ class PipelineGraph:
         self.make_graphs()
 
     def make_graphs(self):
+        """Generates two directed graphs based on the pipeline steps.
+
+        This method creates two directed graphs: callable_graph and display_graph.
+        The callable_graph represents the pipeline steps and their dependencies.
+        The display_graph represents the pipeline steps with their relative names.
+
+        Returns:
+            None
+        """
 
         callable_graph = self.DiGraph()
         display_graph = self.DiGraph()
@@ -52,7 +66,26 @@ class PipelineGraph:
         node_color="orange",
         **kwargs,
     ):
+        """Draws a requirement graph using NetworkX and Matplotlib.
+
+        Args:
+            font_size (int): Font size for node labels (default is 7).
+            layout (str): Layout type for the graph, either "aligned" or "spring" (default is "aligned").
+            ax (matplotlib.axes.Axes): Matplotlib axes to draw the graph on (default is None).
+            figsize (tuple): Figure size for the plot (default is (12, 7)).
+            line_return (bool): Whether to include line return in node labels (default is True).
+            remove_pipe (bool): Whether to remove pipe characters from node labels (default is True).
+            rotation (int): Rotation angle for node labels (default is 18).
+            max_spacing (float): Maximum spacing between nodes (default is 0.28).
+            node_color (str): Color for the nodes (default is "orange").
+            **kwargs: Additional keyword arguments to be passed to NetworkX drawing functions.
+
+        Returns:
+            matplotlib.axes.Axes: The matplotlib axes containing the drawn graph.
+        """
         if ax is None:
+            import matplotlib.pyplot as plt
+
             _, ax = plt.subplots(figsize=figsize)
         if layout == "aligned":
             pos = self.get_aligned_layout()
@@ -74,6 +107,17 @@ class PipelineGraph:
         return ax
 
     def draw_columns_labels(self, pos, ax, font_size=7, rotation=30):
+        """Draw column labels on the plot.
+
+        Args:
+            pos (dict): A dictionary containing the positions of the columns.
+            ax (matplotlib.axes.Axes): The axes object on which to draw the labels.
+            font_size (int, optional): The font size of the labels. Defaults to 7.
+            rotation (int, optional): The rotation angle of the labels in degrees. Defaults to 30.
+
+        Returns:
+            None
+        """
         unique_pos = {}
         for key, value in pos.items():
             column = key.split(".")[0]
@@ -88,6 +132,16 @@ class PipelineGraph:
             ax.axvline(x, ymin=0.1, ymax=0.85, zorder=-1, lw=0.5, color="gray")
 
     def get_labels(self, line_return=True, remove_pipe=True):
+        """Return formatted labels for nodes in the graph.
+
+        Args:
+            line_return (bool): Whether to replace '.' with '\n' in the formatted name. Default is True.
+            remove_pipe (bool): Whether to remove everything before the first '.' in the formatted name.
+                Default is True.
+
+        Returns:
+            dict: A dictionary containing node names as keys and their formatted names as values.
+        """
         labels = {}
         for node_name in self.name_graph.nodes:
             formated_name = node_name
@@ -99,6 +153,11 @@ class PipelineGraph:
         return labels
 
     def get_aligned_layout(self):
+        """Return the layout of nodes in a graph with aligned x-coordinates and negative y-coordinates.
+
+        Returns:
+            dict: A dictionary mapping node names to their (x, y) coordinates in the layout.
+        """
         pipe_x_indices = {pipe.pipe: index for index, pipe in enumerate(self.pipeline.pipes.values())}
         pos = {}
         for node in self.callable_graph.nodes:
@@ -109,6 +168,18 @@ class PipelineGraph:
         return pos
 
     def separate_crowded_levels(self, pos, max_spacing=0.35):
+        """Separate crowded levels by adjusting the x positions of pipes with the same y position.
+
+        Args:
+            pos (dict): A dictionary containing the positions of pipes in the format {pipe_name: (x_pos, y_pos)}.
+            max_spacing (float, optional): The maximum spacing allowed between pipes on the same level.
+                Defaults to 0.35.
+
+        Returns:
+            dict: A dictionary with adjusted positions to separate crowded levels.
+        """
+        from numpy import linspace
+
         treated_pipes = []
         for key, value in pos.items():
             pipe_name = key.split(".")[0]
@@ -120,7 +191,7 @@ class PipelineGraph:
             if len(multi_steps) == 1:
                 continue
             x_min, x_max = x_pos - max_spacing, x_pos + max_spacing
-            new_xs = np.linspace(x_min, x_max, len(multi_steps))
+            new_xs = linspace(x_min, x_max, len(multi_steps))
             for new_x, (k, (x, y)) in zip(new_xs, multi_steps.items()):
                 pos[k] = (new_x, y)
 

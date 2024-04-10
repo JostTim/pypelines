@@ -10,11 +10,34 @@ class BaseMultisessionAccessor:
     step: "BaseStep"
 
     def __init__(self, parent):
+        """Initializes a new instance of the class.
+
+        Args:
+            parent: The parent object.
+
+        Attributes:
+            step: The parent object.
+            _packer: The multisession packer object from the parent's disk class.
+            _unpacker: The multisession unpacker object from the parent's disk class.
+        """
         self.step = parent
         self._packer = self.step.pipe.disk_class.multisession_packer
         self._unpacker = self.step.pipe.disk_class.multisession_unpacker
 
     def load(self, sessions, extras=None):
+        """Load sessions with optional extras and return packed result.
+
+        Args:
+            sessions (DataFrame): The sessions to load.
+            extras (list or tuple, optional): Extra values to be used during loading. If not provided,
+                the same extra value will be used for all sessions.
+
+        Returns:
+            dict: A dictionary containing the loaded sessions.
+
+        Raises:
+            ValueError: If the number of extra values supplied is different than the number of sessions.
+        """
         session_result_dict = {}
 
         if not isinstance(extras, (list, tuple)):
@@ -31,6 +54,20 @@ class BaseMultisessionAccessor:
         return self._packer(sessions, session_result_dict)
 
     def save(self, sessions, datas, extras=None):
+        """Save the data for each session with optional extra values.
+
+        Args:
+            sessions (list): List of session objects.
+            datas (list): List of data objects corresponding to each session.
+            extras (list, tuple, optional): List of extra values to be saved along with each session's data.
+                If not provided, the same extra value will be used for all sessions.
+
+        Raises:
+            ValueError: If the number of extra values supplied is different than the number of sessions.
+
+        Returns:
+            None
+        """
         if not isinstance(extras, (list, tuple)):
             extras = [extras] * len(sessions)
 
@@ -45,6 +82,19 @@ class BaseMultisessionAccessor:
         return None
 
     def generate(self, sessions, *args, extras=None, extra=None, **kwargs):
+        """Generate session results based on provided extras for each session.
+
+        Args:
+            sessions (pandas.DataFrame): The sessions data to generate results for.
+            *args: Additional positional arguments to pass to the generation step.
+            extras (list or None): List of extra values to be used for each session.
+                If None, the same extra value will be used for all sessions.
+            extra: Deprecated argument. Use extras instead.
+            **kwargs: Additional keyword arguments to pass to the generation step.
+
+        Returns:
+            dict: A dictionary containing the generated results for each session.
+        """
         session_result_dict = {}
 
         if extra is not None:
@@ -77,11 +127,30 @@ class BaseMultisessionAccessor:
         return self._packer(sessions, session_result_dict)
 
     def start_tasks(self, sessions):
+        """Starts tasks for each session in the given sessions.
+
+        Args:
+            sessions: A pandas DataFrame containing sessions.
+
+        Returns:
+            None
+        """
         for session in sessions.iterrows():
             self.step.task.start(session)
 
 
 def assert_dataframe(sessions):
+    """Check if the input is a pandas DataFrame.
+
+    Args:
+        sessions (pd.DataFrame): The input to be checked.
+
+    Returns:
+        bool: True if the input is a pandas DataFrame.
+
+    Raises:
+        ValueError: If the input is a pandas Series or not a DataFrame.
+    """
     if isinstance(sessions, pd.DataFrame):
         return True
     elif isinstance(sessions, pd.Series):

@@ -16,10 +16,25 @@ class PickleDiskObject(BaseDiskObject):
     is_legacy_format = False
 
     def __init__(self, session, step, extra=""):
+        """Initialize the StepTask object.
+
+        Args:
+            session: The session object for the task.
+            step: The step object for the task.
+            extra: Additional information for the task (default is an empty string).
+        """
         self.file_prefix = step.pipeline.pipeline_name
         super().__init__(session, step, extra)
 
     def version_deprecated(self) -> bool:
+        """Check if the current version is deprecated.
+
+        This method compares the current version with the disk version and returns True if they are different,
+        indicating that the current version is deprecated. Otherwise, it returns False.
+
+        Returns:
+            bool: True if the current version is deprecated, False otherwise.
+        """
         logger = logging.getLogger("pickle.version_deprecated")
 
         # if we didn't found the disk version, we return False.
@@ -39,6 +54,11 @@ class PickleDiskObject(BaseDiskObject):
         return False
 
     def step_level_too_low(self) -> bool:
+        """Check if the level of the disk step is lower than the current step level.
+
+        Returns:
+            bool: True if the disk step level is lower than the current step level, False otherwise.
+        """
         logger = logging.getLogger("pickle.step_level_too_low")
 
         # we get the step instance that corresponds to the one on the disk
@@ -64,9 +84,19 @@ class PickleDiskObject(BaseDiskObject):
 
     @property
     def version(self):
+        """Return the version of the pipeline."""
         return self.step.pipe.version
 
     def parse_extra(self, extra, regexp=False):
+        """Parses the extra string by optionally applying a regular expression pattern.
+
+        Args:
+            extra (str): The extra string to be parsed.
+            regexp (bool): A flag indicating whether to apply regular expression pattern (default is False).
+
+        Returns:
+            str: The parsed extra string.
+        """
         extra = extra.strip(".")
         if regexp:
             extra = extra.replace(".", r"\.")
@@ -76,6 +106,11 @@ class PickleDiskObject(BaseDiskObject):
         return extra
 
     def make_file_name_pattern(self):
+        """Generate a file name pattern based on the steps in the pipeline.
+
+        Returns:
+            str: A regular expression pattern for creating file names based on the steps in the pipeline.
+        """
         steps_patterns = []
 
         for key in sorted(self.step.pipe.steps.keys()):
@@ -93,6 +128,11 @@ class PickleDiskObject(BaseDiskObject):
         return pattern
 
     def get_file_name(self):
+        """Return the file name based on the object attributes.
+
+        Returns:
+            str: The generated file name.
+        """
         extra = self.parse_extra(self.extra, regexp=False)
         version_string = "." + self.version if self.version else ""
         filename = (
@@ -109,6 +149,11 @@ class PickleDiskObject(BaseDiskObject):
         return filename
 
     def check_disk(self):
+        """Check disk for matching files based on specified pattern and expected values.
+
+        Returns:
+            bool: True if a matching file is found, False otherwise.
+        """
         logger = logging.getLogger("pickle.check_disk")
 
         search_path = os.path.join(self.session.path, os.path.sep.join(self.collection))
@@ -167,13 +212,28 @@ class PickleDiskObject(BaseDiskObject):
             return False
 
     def get_found_disk_object_description(self):
+        """Return the description of the found disk object."""
         return str(self.current_disk_file)
 
     def get_full_path(self):
+        """Return the full path of the file by joining the session path, collection, and file name.
+
+        Returns:
+            str: The full path of the file.
+        """
         full_path = os.path.join(self.session.path, os.path.sep.join(self.collection), self.get_file_name())
         return full_path
 
     def save(self, data):
+        """Save data to disk.
+
+        Args:
+            data: Data to be saved to disk. If data is a pandas DataFrame, it will be saved as a pickle file.
+                Otherwise, it will be pickled and saved.
+
+        Returns:
+            None
+        """
         logger = logging.getLogger("PickleDiskObject.save")
         new_full_path = self.get_full_path()
         logger.debug(f"Saving to path : {new_full_path}")
@@ -192,6 +252,14 @@ class PickleDiskObject(BaseDiskObject):
         self.current_disk_file = new_full_path
 
     def load(self):
+        """Load data from the current disk file.
+
+        Raises:
+            IOError: If no file was found on disk or 'check_disk()' was not run.
+
+        Returns:
+            The loaded data from the disk file.
+        """
         logger = logging.getLogger("PickleDiskObject.load")
         logger.debug(f"Current disk file status : {self.current_disk_file=}")
         if self.current_disk_file is None:
@@ -219,6 +287,17 @@ class PickleDiskObject(BaseDiskObject):
 
     @staticmethod
     def multisession_packer(sessions, session_result_dict: dict) -> pd.DataFrame | dict:
+        """Packs the results of multiple sessions into a DataFrame
+            if all values in the session_result_dict are DataFrames.
+
+        Args:
+            sessions: List of sessions.
+            session_result_dict (dict): Dictionary containing the results of each session.
+
+        Returns:
+            pd.DataFrame or dict: Returns a DataFrame if all values in session_result_dict are DataFrames,
+                otherwise returns the original session_result_dict.
+        """
         session_result_dict = BaseDiskObject.multisession_packer(sessions, session_result_dict)
 
         are_dataframe = [isinstance(item, pd.core.frame.DataFrame) for item in session_result_dict.values()]
@@ -230,6 +309,15 @@ class PickleDiskObject(BaseDiskObject):
 
     @staticmethod
     def get_multi_session_df(multisession_data_dict: dict, add_session_level: bool = False) -> pd.DataFrame:
+        """Return a pandas DataFrame by combining multiple session dataframes.
+
+        Args:
+            multisession_data_dict (dict): A dictionary containing session names as keys and dataframes as values.
+            add_session_level (bool, optional): Whether to add session level to the index. Defaults to False.
+
+        Returns:
+            pd.DataFrame: A combined dataframe containing data from all sessions.
+        """
         dataframes = []
         for session_name, dataframe in multisession_data_dict.items():
             level_names = list(dataframe.index.names)
@@ -257,6 +345,15 @@ class PickleDiskObject(BaseDiskObject):
 
     @staticmethod
     def merge_index_element(values: tuple | str | float | int, session_name: str) -> tuple:
+        """Merge the elements of the input values with the session name.
+
+        Args:
+            values (tuple | str | float | int): The values to be merged with the session name.
+            session_name (str): The name of the session to be merged with the values.
+
+        Returns:
+            tuple: A tuple containing the merged values with the session name.
+        """
         if not isinstance(values, tuple):
             values = (values,)
 
@@ -305,6 +402,14 @@ def files(
     output_list = []
 
     def _recursive_search(_input_path):
+        """Recursively search for files and directories in the given input path.
+
+        Args:
+            _input_path (str): The input path to start the recursive search from.
+
+        Returns:
+            None
+        """
         nonlocal current_level
         for subdir in os.listdir(_input_path):
             fullpath = os.path.join(_input_path, subdir)
