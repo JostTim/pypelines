@@ -6,6 +6,8 @@ from .disk import BaseDiskObject
 from functools import wraps
 import inspect, hashlib
 
+from pandas import DataFrame
+
 from abc import ABCMeta, abstractmethod
 
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING, Literal, Dict
@@ -208,7 +210,23 @@ class BasePipe(metaclass=ABCMeta):
             list(self.steps.values()), key=lambda item: item.get_level(selfish=True), reverse=reverse
         )
 
+        highest_step = None
+
+        if isinstance(session, DataFrame):
+            # if multisession, we assume we are trying to just load sessions
+            # that all have reached the same level of requirements. (otherwise, use generate)
+            # because of that, we use only the first session in the lot to search the highest loadable step
+            search_on_session = session.iloc[0]
+        else:
+            search_on_session = session
+
         for step in ordered_steps:
-            if step.get_disk_object(session, extra).is_matching():
-                return step.load(session, extra)
+            if step.get_disk_object(search_on_session, extra).is_matching():
+                highest_step = step
+
+        if highest_step is not None:  # if we found one : it is not None
+            # we use the load wrapper, wich will dispatch to multissession or not automatically,
+            # depending on session type (Series or DataFrame)
+            return highest_step.load(session, extra)
+
         raise ValueError(f"Could not find a {self} object to load for the session {session.alias} with extra {extra}")

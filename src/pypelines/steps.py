@@ -1,8 +1,9 @@
 from functools import wraps, partial, update_wrapper
 from .loggs import loggedmethod, NAMELENGTH
 from .arguments import autoload_arguments
-import logging, inspect
 
+import logging, inspect
+from pandas import DataFrame
 from dataclasses import dataclass
 
 from types import MethodType
@@ -258,6 +259,9 @@ class BaseStep:
                 ValueError: If the disk object does not match and has a status message.
             """
             # print("extra in load wrapper : ", extra)
+            if isinstance(session, DataFrame):
+                return self.multisession.load(sessions=session, extras=extra)
+
             if extra is None:
                 extra = self.get_default_extra()
             # print("extra in load wrapper after None : ", extra)
