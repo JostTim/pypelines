@@ -87,9 +87,9 @@ def enable_logging(
         min(terminal_level, file_level)
     )  # set logger level to the lowest usefull, to be sure we can capture messages necessary in handlers
 
-    for handler in [fh, ch]:
+    for handler, level in zip([fh, ch], [file_level, terminal_level]):
 
-        handler.setLevel(file_level)
+        handler.setLevel(level)
         logger.addHandler(handler)
 
 
