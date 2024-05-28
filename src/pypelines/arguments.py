@@ -117,12 +117,12 @@ def get_step_arguments(session, step):
     try:
         config_args = read_session_arguments_file(session, step)["functions"][step.relative_name]
     except FileNotFoundError as e:
-        local_log.debug(f"{type(e).__name__} : {e}. Skipping")
+        local_log.debug(f"{type(e).__name__} : {e}. Skipping autoload_arguments")
         return {}
     except KeyError:
         local_log.debug(
             f"Could not find the `functions` key or the key `{step.relative_name}` in pipelines_arguments.json file at"
-            f" {session.path}. Skipping"
+            f" {session.path}. Skipping autoload_arguments"
         )
         return {}
 

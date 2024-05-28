@@ -14,7 +14,7 @@ from coloredlogs import (
 from pathlib import Path
 
 NAMELENGTH = 33  # global variable for formatting the length of the padding dedicated to name part in a logging record
-LEVELLENGTH = 8  # global variable for formatting the length of the padding dedicated to levelname part in a record
+LEVELLENGTH = 9  # global variable for formatting the length of the padding dedicated to levelname part in a record
 
 
 def enable_logging(
@@ -246,11 +246,11 @@ class SugarColoredFormatter(DynamicColoredFormatter):
 
 
 class TerminalFormatter(SugarColoredFormatter):
-    FORMAT = f"%(levelname)-{LEVELLENGTH}s : %(name)-{NAMELENGTH}s : %(message)s - %(asctime)s"
+    FORMAT = f"%(levelname)-{LEVELLENGTH}s: %(name)-{NAMELENGTH}s : %(message)s - %(asctime)s"
 
 
 class FileFormatter(SugarColoredFormatter):
-    FORMAT = f"[%(asctime)s] %(hostname)s %(levelname)-{LEVELLENGTH}s : %(name)-{NAMELENGTH}s : %(message)s"
+    FORMAT = f"[%(asctime)s] %(hostname)s %(levelname)-{LEVELLENGTH}s: %(name)-{NAMELENGTH}s : %(message)s"
 
 
 class ContextFilter(logging.Filter):
