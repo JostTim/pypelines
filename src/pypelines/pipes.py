@@ -17,7 +17,12 @@ if TYPE_CHECKING:
     from .pipelines import Pipeline
 
 
-class BasePipe(metaclass=ABCMeta):
+class BasePipeType(Protocol):
+
+    def __getattr__(self, name: str) -> "BaseStep": ...
+
+
+class BasePipe(BasePipeType, metaclass=ABCMeta):
     # this class must implements only the logic to link steps together.
 
     default_extra = None

@@ -7,7 +7,7 @@ from pandas import DataFrame
 from dataclasses import dataclass
 
 from types import MethodType
-from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING
+from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -244,7 +244,7 @@ class BaseStep:
         """
 
         @wraps(self.pipe.disk_class.load)
-        def wrapper(session, extra=None, strict=False):
+        def wrapper(session, extra=None, strict=False) -> Any:
             """Wrapper function to load disk object with session and optional extra parameters.
 
             Args:

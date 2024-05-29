@@ -10,7 +10,12 @@ if TYPE_CHECKING:
     from .graphs import PipelineGraph
 
 
-class Pipeline:
+class PipelineType(Protocol):
+
+    def __getattr__(self, name: str) -> "BasePipe": ...
+
+
+class Pipeline(PipelineType):
     pipes: Dict[str, "BasePipe"]
     runner_backend_class = BaseTaskBackend
 
