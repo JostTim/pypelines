@@ -300,6 +300,10 @@ class BaseStep:
         self.pipeline.resolve()
         return StepLevel(self).resolve_level(selfish=selfish)
 
+    def is_required(self):
+        # TODO implement this (False if the step is not present in any other step' requirement stack, else True)
+        raise NotImplementedError
+
     def get_disk_object(self, session, extra=None):
         """Return a disk object based on the provided session and optional extra parameters.
 
@@ -517,29 +521,7 @@ class BaseStep:
             if save_output:
                 logger.save(f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output.")
                 disk_object.save(result)
-
-                # AFTER the saving has been done, if there is some callback function that should be run, we execute them
-                # If an exception is thrown in a callback, the whole pipeline will stop, intentionnaly.
-                # TODO an option could be added to catch, display and store exceptions tracebacks,
-                # while allowing the pipeline to continue,
-                # in case the callbacks are not absolutely necessary for the pipeline process. (ex, generate plots)
-                for callback_data in self.callbacks:
-                    arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
-                    if isinstance(callback_data, tuple):
-                        callback = callback_data[0]
-                        overriding_arguments = callback_data[1]
-                    else:
-                        callback = callback_data
-                        overriding_arguments = {}
-                    arguments.update(overriding_arguments)
-                    try:
-                        callback(**arguments)
-                    except Exception as e:
-                        import traceback
-
-                        traceback_msg = traceback.format_exc()
-                        logger.error(f"The callback {callback} failed with error : {e}")
-                        logger.error("Full traceback below :\n" + traceback_msg)
+                self.run_callbacks(session, extra, show_plots=False)
 
             return result
 
@@ -572,6 +554,27 @@ class BaseStep:
         wrapper.__doc__ = self.generate_doc()
 
         return wrapper
+
+    def run_callbacks(self, session, extra="", show_plots=True) -> None:
+        logger = logging.getLogger("callback_runner")
+        for callback_data in self.callbacks:
+            arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
+            if isinstance(callback_data, tuple):
+                callback = callback_data[0]
+                overriding_arguments = callback_data[1]
+            else:
+                callback = callback_data
+                overriding_arguments = {}
+            arguments.update(overriding_arguments)
+            try:
+                logger.info(f"Running the callback {callback.__name__}")
+                callback(**arguments)
+            except Exception as e:
+                import traceback
+
+                traceback_msg = traceback.format_exc()
+                logger.error(f"The callback {callback} failed with error : {e}")
+                logger.error("Full traceback below :\n" + traceback_msg)
 
     def generate_doc(self) -> str:
         """Generate a new docstring by inserting a chapter about Pipeline Args before the existing

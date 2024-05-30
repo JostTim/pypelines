@@ -715,7 +715,10 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         Returns:
             dict: A dictionary containing information about remote tasks, including workers and task names.
         """
-        registered_tasks = self.control.inspect().registered_tasks()
+        try:
+            registered_tasks = self.control.inspect().registered_tasks()
+        except ConnectionResetError:
+            return None
         workers = []
         task_names = []
         if registered_tasks:
