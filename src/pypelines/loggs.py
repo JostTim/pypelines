@@ -13,8 +13,26 @@ from coloredlogs import (
 )
 from pathlib import Path
 
+from typing import Protocol, Callable, cast
+
 NAMELENGTH = 33  # global variable for formatting the length of the padding dedicated to name part in a logging record
 LEVELLENGTH = 9  # global variable for formatting the length of the padding dedicated to levelname part in a record
+
+
+class PypelineLoggerProtocol(Protocol):
+    def save(self, msg, *args, **kwargs) -> None: ...
+    def load(self, msg, *args, **kwargs) -> None: ...
+    def note(self, msg, *args, **kwargs) -> None: ...
+    def start(self, msg, *args, **kwargs) -> None: ...
+    def end(self, msg, *args, **kwargs) -> None: ...
+    def header(self, msg, *args, **kwargs) -> None: ...
+
+
+class PypelineLogger(logging.Logger, PypelineLoggerProtocol):
+    pass
+
+
+getLogger = cast(Callable[[str], PypelineLogger], logging.getLogger)
 
 
 def enable_logging(
