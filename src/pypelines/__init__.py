@@ -1,4 +1,4 @@
-__version__ = "0.0.63"
+__version__ = "0.0.65"
 
 from . import loggs
 from .pipes import *
