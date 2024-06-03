@@ -188,10 +188,9 @@ class BaseStep:
         """Return the result of calling the get_generate_wrapped method."""
         return self.get_generate_wrapped()
 
-    # def make_wrapped_functions(self):
-    #     self.save = self.make_wrapped_save()
-    #     self.load = self.make_wrapped_load()
-    #     self.generate = self.make_wrapped_generate()
+    @property
+    def run_callbacks(self):
+        return self.get_run_callbacks()
 
     def get_save_wrapped(self):
         """Returns a wrapped function that saves data using the disk class.
@@ -287,6 +286,33 @@ class BaseStep:
                 self,
             )
         return autoload_arguments(loggedmethod(self.generation_mechanism), self)
+
+    def get_run_callbacks(self):
+        def wrapper(session, extra="", show_plots=True):
+            logger = logging.getLogger("callback_runner")
+            for callback_data in self.callbacks:
+                arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
+                if isinstance(callback_data, tuple):
+                    callback = callback_data[0]
+                    overriding_arguments = callback_data[1]
+                else:
+                    callback = callback_data
+                    overriding_arguments = {}
+                arguments.update(overriding_arguments)
+                on_what = f"{session.alias}.{extra}" if extra else session.alias
+                try:
+                    logger.info(f"Running the callback {callback.__name__} on {on_what}")
+                    callback(**arguments)
+                except Exception as e:
+                    import traceback
+
+                    traceback_msg = traceback.format_exc()
+                    logger.error(f"The callback {callback} failed with error : {e}")
+                    logger.error(f"Full traceback below :\n{traceback_msg}")
+
+        if self.do_dispatch:
+            return self.pipe.dispatcher(wrapper, "callbacks")
+        return wrapper
 
     def get_level(self, selfish=False) -> int:
         """Get the level of the step.
@@ -521,7 +547,7 @@ class BaseStep:
             if save_output:
                 logger.save(f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output.")
                 disk_object.save(result)
-                self.run_callbacks(session, extra, show_plots=False)
+                self.run_callbacks(session, extra=extra, show_plots=False)
 
             return result
 
@@ -554,27 +580,6 @@ class BaseStep:
         wrapper.__doc__ = self.generate_doc()
 
         return wrapper
-
-    def run_callbacks(self, session, extra="", show_plots=True) -> None:
-        logger = logging.getLogger("callback_runner")
-        for callback_data in self.callbacks:
-            arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
-            if isinstance(callback_data, tuple):
-                callback = callback_data[0]
-                overriding_arguments = callback_data[1]
-            else:
-                callback = callback_data
-                overriding_arguments = {}
-            arguments.update(overriding_arguments)
-            try:
-                logger.info(f"Running the callback {callback.__name__}")
-                callback(**arguments)
-            except Exception as e:
-                import traceback
-
-                traceback_msg = traceback.format_exc()
-                logger.error(f"The callback {callback} failed with error : {e}")
-                logger.error("Full traceback below :\n" + traceback_msg)
 
     def generate_doc(self) -> str:
         """Generate a new docstring by inserting a chapter about Pipeline Args before the existing
