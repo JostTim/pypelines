@@ -288,7 +288,11 @@ class BaseStep:
         return autoload_arguments(loggedmethod(self.generation_mechanism), self)
 
     def get_run_callbacks(self):
-        def wrapper(session, extra="", show_plots=True):
+        def wrapper(session, extra=None, show_plots=True):
+
+            if extra is None:
+                extra = self.get_default_extra()
+
             logger = logging.getLogger("callback_runner")
             for callback_data in self.callbacks:
                 arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
