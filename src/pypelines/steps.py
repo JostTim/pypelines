@@ -77,12 +77,7 @@ class BaseStep:
     pipe: "BasePipe"
     pipeline: "Pipeline"
 
-    def __init__(
-        self,
-        pipeline: "Pipeline",
-        pipe: "BasePipe",
-        worker: MethodType,
-    ):
+    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: MethodType, step_name=None):
         """Initialize a BaseStep object.
 
         Args:
@@ -111,12 +106,15 @@ class BaseStep:
 
         # we attach the values of the worker elements to BaseStep
         # as they are get only (no setter) on worker (bound method)
-        self.do_dispatch = self.worker.do_dispatch
-        self.version = self.worker.version
-        self.requires = self.worker.requires
-        self.step_name = self.worker.step_name
+        self.do_dispatch = getattr(self.worker, "do_dispatch", False)
+        self.version = getattr(self.worker, "version", 0)
+        self.requires = getattr(self.worker, "requires", [])
+        self.step_name = getattr(self.worker, "step_name", step_name)
 
-        self.callbacks = self.worker.callbacks
+        if not self.step_name:
+            raise ValueError("Step name cannot be blank nor None")
+
+        self.callbacks = getattr(self.worker, "callbacks", [])
 
         self.worker = MethodType(worker.__func__, self)
 

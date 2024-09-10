@@ -10,7 +10,11 @@ if TYPE_CHECKING:
     from .graphs import PipelineGraph
 
 
-class Pipeline:
+class BasePipelineType(Protocol):
+    def __getattr__(self, name: str) -> "BasePipe": ...
+
+
+class Pipeline(BasePipelineType):
     pipes: Dict[str, "BasePipe"]
     runner_backend_class = BaseTaskBackend
 
@@ -61,7 +65,8 @@ class Pipeline:
         return pipe_class
 
     def resolve_instance(self, instance_name: str) -> "BaseStep":
-        """Resolve the specified instance name to a BaseStep object.
+        """Resolve the specified step instance name to a BaseStep object,
+        looking at the pipe and step names separated by a comma.
 
         Args:
             instance_name (str): The name of the instance in the format 'pipe_name.step_name'.

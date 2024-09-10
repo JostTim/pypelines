@@ -68,9 +68,22 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         self.pipe_name = self.__class__.__name__
 
         _steps: Dict[str, MethodType] = {}
+
+        steps_members_scanner = inspect.getmembers(self, predicate=inspect.ismethod)
+        requires_is_step_attr = True
+
+        for class_name, class_object in inspect.getmembers(self, predicate=inspect.isclass):
+            print(class_name, class_object)
+            if class_name == "Steps":
+                print("FOUND")
+                steps_members_scanner = inspect.getmembers(class_object(), predicate=inspect.ismethod)
+                requires_is_step_attr = False
+                break
+
         # this loop populates self.steps dictionnary from the instanciated (bound) step methods.
-        for step_name, step in inspect.getmembers(self, predicate=inspect.ismethod):
-            if getattr(step, "is_step", False):
+        for step_name, step in steps_members_scanner:
+            print("step:", step_name)
+            if not requires_is_step_attr or getattr(step, "is_step", False):
                 _steps[step_name] = step
 
         if len(_steps) < 1:
@@ -86,7 +99,7 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
 
         number_of_steps_with_requirements = 0
         for step in _steps.values():
-            if len(step.requires):
+            if len(getattr(step, "requires", [])):
                 number_of_steps_with_requirements += 1
 
         if number_of_steps_with_requirements < len(_steps) - 1:
@@ -99,7 +112,7 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         # They must inherit from BaseStep
         self.steps = {}
         for step_name, step in _steps.items():
-            step = self.step_class(self.pipeline, self, step)  # , step_name)
+            step = self.step_class(self.pipeline, self, step, step_name=step_name)  # , step_name)
             self.steps[step_name] = step  # replace the bound_method by a step_class using that bound method,
             # so that we attach the necessary components to it.
             setattr(self, step_name, step)
