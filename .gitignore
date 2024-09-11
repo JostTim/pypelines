@@ -1,4 +1,5 @@
 .vscode*
+.pdm*
 pypelines/__pycache__*
 tests/__pycache__*
 *.egg-info*
@@ -9,3 +10,6 @@ dist/*
 notebooks/pipelines_tests/*
 notebooks/*.log
 build*
+.coverage
+coverage*
+pytest_results*

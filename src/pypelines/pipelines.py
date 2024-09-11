@@ -10,11 +10,7 @@ if TYPE_CHECKING:
     from .graphs import PipelineGraph
 
 
-class BasePipelineType(Protocol):
-    def __getattr__(self, name: str) -> "BasePipe": ...
-
-
-class Pipeline(BasePipelineType):
+class Pipeline:
     pipes: Dict[str, "BasePipe"]
     runner_backend_class = BaseTaskBackend
 
@@ -107,6 +103,11 @@ class Pipeline(BasePipelineType):
                 step.requires = instanciated_requires
 
         self.resolved = True
+
+    def __getattr__(self, name: str) -> "BasePipe":
+        if name in self.pipes:
+            return self.pipes[name]
+        raise AttributeError(f"'Pipeline' object has no attribute '{name}'")
 
     def get_requirement_stack(
         self, instance: "BaseStep", names: bool = False, max_recursion: int = 100
