@@ -1,6 +1,7 @@
 from functools import wraps, partial, update_wrapper
 from .loggs import loggedmethod, NAMELENGTH
 from .arguments import autoload_arguments
+from .utils import to_snake_case
 
 import logging, inspect
 from pandas import DataFrame
@@ -56,7 +57,7 @@ def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]
         function.is_step = True
         function.version = version
         function.do_dispatch = do_dispatch
-        function.step_name = function.__name__
+        function.step_name = to_snake_case(function.__name__)
         function.callbacks = [on_save_callbacks] if not isinstance(on_save_callbacks, list) else on_save_callbacks
         return function
 
@@ -77,7 +78,7 @@ class BaseStep:
     pipe: "BasePipe"
     pipeline: "Pipeline"
 
-    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: MethodType, step_name=None):
+    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: MethodType, step_name: str = ""):
         """Initialize a BaseStep object.
 
         Args:
@@ -109,7 +110,7 @@ class BaseStep:
         self.do_dispatch = getattr(self.worker, "do_dispatch", False)
         self.version = getattr(self.worker, "version", 0)
         self.requires = getattr(self.worker, "requires", [])
-        self.step_name = getattr(self.worker, "step_name", step_name)
+        self.step_name = to_snake_case(getattr(self.worker, "step_name", step_name))
 
         if not self.step_name:
             raise ValueError("Step name cannot be blank nor None")

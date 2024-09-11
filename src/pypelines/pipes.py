@@ -2,6 +2,7 @@ from .steps import BaseStep
 from .multisession import BaseMultisessionAccessor
 from .sessions import Session
 from .disk import BaseDiskObject
+from .utils import to_snake_case
 
 from functools import wraps
 import inspect, hashlib
@@ -12,6 +13,7 @@ from abc import ABCMeta, abstractmethod
 
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING, Literal, Dict
 from types import MethodType
+
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -65,7 +67,7 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
             None
         """
         self.pipeline = parent_pipeline
-        self.pipe_name = self.__class__.__name__
+        self.pipe_name = to_snake_case(self.__class__.__name__)
 
         _steps: Dict[str, MethodType] = {}
 
@@ -84,6 +86,7 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         for step_name, step in steps_members_scanner:
             print("step:", step_name)
             if not requires_is_step_attr or getattr(step, "is_step", False):
+                step_name = to_snake_case(step_name)
                 _steps[step_name] = step
 
         if len(_steps) < 1:
