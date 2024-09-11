@@ -75,19 +75,19 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         requires_is_step_attr = True
 
         for class_name, class_object in inspect.getmembers(self, predicate=inspect.isclass):
-            print(class_name, class_object)
             if class_name == "Steps":
-                print("FOUND")
                 steps_members_scanner = inspect.getmembers(class_object(), predicate=inspect.ismethod)
                 requires_is_step_attr = False
                 break
 
         # this loop populates self.steps dictionnary from the instanciated (bound) step methods.
         for step_name, step in steps_members_scanner:
-            print("step:", step_name)
             if not requires_is_step_attr or getattr(step, "is_step", False):
                 step_name = to_snake_case(step_name)
                 _steps[step_name] = step
+
+        for step_name, step in inspect.getmembers(self, predicate=inspect.isclass):
+            if 
 
         if len(_steps) < 1:
             raise ValueError(

@@ -8,7 +8,7 @@ from pandas import DataFrame
 from dataclasses import dataclass
 
 from types import MethodType
-from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any
+from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -78,7 +78,9 @@ class BaseStep:
     pipe: "BasePipe"
     pipeline: "Pipeline"
 
-    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: MethodType, step_name: str = ""):
+    def __init__(
+        self, pipeline: "Pipeline", pipe: "BasePipe", worker: Optional[MethodType] = None, step_name: str = ""
+    ):
         """Initialize a BaseStep object.
 
         Args:
@@ -102,22 +104,37 @@ class BaseStep:
         self.pipeline = pipeline
         # save an instanciated access to the pipe parent
         self.pipe = pipe
+
+        self.step_name = to_snake_case(self.get_attribute_or_default("step_name", step_name))
+
+        if not self.step_name:
+            raise ValueError(f"Step name in {self.pipe.pipe_name} cannot be blank nor None")
+
         # save an instanciated access to the step function (undecorated)
-        self.worker = worker
+        if not hasattr(self, "worker"):
+            if worker is None:
+                raise AttributeError(
+                    f"For the step : {self.pipe.pipe_name}.{self.step_name}, a worker method must "
+                    "be defined if created from a class"
+                )
+            needs_attachment = True
+            self.worker = worker
+        else:
+            needs_attachment = False
 
         # we attach the values of the worker elements to BaseStep
         # as they are get only (no setter) on worker (bound method)
-        self.do_dispatch = getattr(self.worker, "do_dispatch", False)
-        self.version = getattr(self.worker, "version", 0)
-        self.requires = getattr(self.worker, "requires", [])
-        self.step_name = to_snake_case(getattr(self.worker, "step_name", step_name))
 
-        if not self.step_name:
-            raise ValueError("Step name cannot be blank nor None")
+        getattr(self, "do_dispatch", getattr(self.worker, "do_dispatch", False))
 
-        self.callbacks = getattr(self.worker, "callbacks", [])
+        self.do_dispatch = self.get_attribute_or_default("do_dispatch", False)
+        self.version = self.get_attribute_or_default("version", 0)
+        self.requires = self.get_attribute_or_default("requires", [])
 
-        self.worker = MethodType(worker.__func__, self)
+        self.callbacks = self.get_attribute_or_default("callbacks", [])
+
+        if needs_attachment:
+            self.worker = MethodType(worker.__func__, self)
 
         # self.make_wrapped_functions()
 
@@ -127,6 +144,10 @@ class BaseStep:
         self.multisession = self.pipe.multisession_class(self)
 
         self.task = self.pipeline.runner_backend.create_task_manager(self)
+
+    def get_attribute_or_default(self, attribute_name: str, default: Any) -> Any:
+        # TODO : fix here , when calling get_attribute_or_default before worker s set, cannot work
+        return getattr(self, attribute_name, getattr(self.worker, attribute_name, default))
 
     @property
     def requirement_stack(self) -> Callable:
