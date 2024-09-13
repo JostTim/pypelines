@@ -17,22 +17,6 @@ from pathlib import Path
 
 
 @pytest.fixture
-def pipeline_steps_group_class_based():
-
-    test_pipeline = Pipeline("test_class_based")
-
-    @test_pipeline.register_pipe
-    class MyPipe(PicklePipe):
-        class Steps:
-            def my_step(self, session, extra=""):
-                return "a_good_result"
-
-            my_step.requires = []
-
-    return test_pipeline
-
-
-@pytest.fixture
 def pipeline_method_based():
 
     test_pipeline = Pipeline("test_method_based")
@@ -47,8 +31,39 @@ def pipeline_method_based():
     return test_pipeline
 
 
+@pytest.fixture
+def pipeline_steps_group_class_based():
+
+    test_pipeline = Pipeline("test_group_based")
+
+    @test_pipeline.register_pipe
+    class MyPipe(PicklePipe):
+        class Steps:
+            def my_step(self, session, extra=""):
+                return "a_good_result"
+
+            my_step.requires = []
+
+    return test_pipeline
+
+
+@pytest.fixture
+def pipeline_class_based():
+
+    test_pipeline = Pipeline("test_class_based")
+
+    @test_pipeline.register_pipe
+    class MyPipe(PicklePipe):
+
+        class MyStep(BaseStep):
+            def worker(self, session, extra=""):
+                return "a_good_result"
+
+    return test_pipeline
+
+
 def get_pipelines_fixtures():
-    return ["pipeline_method_based", "pipeline_steps_group_class_based"]
+    return ["pipeline_method_based", "pipeline_steps_group_class_based", "pipeline_class_based"]
 
 
 @pytest.fixture
@@ -85,6 +100,7 @@ def test_pypeline_creation(request, pipeline_fixture_name):
     assert hasattr(pipeline.my_pipe.my_step, "generate")
     assert hasattr(pipeline.my_pipe.my_step, "load")
     assert hasattr(pipeline.my_pipe.my_step, "save")
+    assert len(pipeline.my_pipe.steps) == 1
 
 
 @pytest.mark.parametrize("pipeline_fixture_name", get_pipelines_fixtures())

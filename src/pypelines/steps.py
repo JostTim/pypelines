@@ -73,14 +73,14 @@ class BaseStep:
     do_dispatch: bool
     callbacks: List[Callable]
 
+    disk_class: "Type[BaseDiskObject]"
+
     task: "BaseStepTaskManager"
     worker: Callable
     pipe: "BasePipe"
     pipeline: "Pipeline"
 
-    def __init__(
-        self, pipeline: "Pipeline", pipe: "BasePipe", worker: Optional[MethodType] = None, step_name: str = ""
-    ):
+    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: Optional[MethodType] = None):
         """Initialize a BaseStep object.
 
         Args:
@@ -105,49 +105,57 @@ class BaseStep:
         # save an instanciated access to the pipe parent
         self.pipe = pipe
 
-        self.step_name = to_snake_case(self.get_attribute_or_default("step_name", step_name))
-
-        if not self.step_name:
-            raise ValueError(f"Step name in {self.pipe.pipe_name} cannot be blank nor None")
+        self.step_name = self.get_step_name(worker)
 
         # save an instanciated access to the step function (undecorated)
-        if not hasattr(self, "worker"):
-            if worker is None:
-                raise AttributeError(
-                    f"For the step : {self.pipe.pipe_name}.{self.step_name}, a worker method must "
-                    "be defined if created from a class"
-                )
-            needs_attachment = True
-            self.worker = worker
-        else:
-            needs_attachment = False
+        self.find_and_bind_worker(worker)
 
-        # we attach the values of the worker elements to BaseStep
-        # as they are get only (no setter) on worker (bound method)
-
-        getattr(self, "do_dispatch", getattr(self.worker, "do_dispatch", False))
-
+        # we attach the values of the worker elements to the Step
+        # as they are get only (no setter) on worker if it is not None (bound method)
         self.do_dispatch = self.get_attribute_or_default("do_dispatch", False)
         self.version = self.get_attribute_or_default("version", 0)
         self.requires = self.get_attribute_or_default("requires", [])
 
         self.callbacks = self.get_attribute_or_default("callbacks", [])
 
-        if needs_attachment:
-            self.worker = MethodType(worker.__func__, self)
-
         # self.make_wrapped_functions()
-
-        update_wrapper(self, self.worker)
-        # update_wrapper(self.generate, self.worker)
 
         self.multisession = self.pipe.multisession_class(self)
 
         self.task = self.pipeline.runner_backend.create_task_manager(self)
 
     def get_attribute_or_default(self, attribute_name: str, default: Any) -> Any:
-        # TODO : fix here , when calling get_attribute_or_default before worker s set, cannot work
         return getattr(self, attribute_name, getattr(self.worker, attribute_name, default))
+
+    def find_and_bind_worker(self, worker_object: Optional[MethodType]):
+        if not hasattr(self, "worker"):
+            if worker_object is None:
+                AttributeError(self.worker_unfindable_message)
+            else:
+                self.worker = MethodType(worker_object.__func__, self)
+                update_wrapper(self, self.worker)
+        # else worker is already bound
+
+    @property
+    def worker_unfindable_message(self):
+        return (
+            f"For the step : {self.pipe.pipe_name}.{getattr(self, 'step_name', '<unknown>')}, a worker method must "
+            "be defined if created from a class"
+        )
+
+    def get_step_name(self, worker_object: Optional[MethodType]):
+        if not hasattr(self, "worker"):
+            if worker_object is None:
+                raise AttributeError(self.worker_unfindable_message)
+            step_name = getattr(self, "step_name", getattr(worker_object, "step_name", worker_object.__name__))
+        else:
+            step_name = self.get_attribute_or_default("step_name", self.__class__.__name__)
+        step_name = to_snake_case(step_name)
+
+        if not step_name:
+            raise ValueError(f'Step name in {self.pipe.pipe_name} cannot be an empty string "" or None')
+
+        return step_name
 
     @property
     def requirement_stack(self) -> Callable:
@@ -226,7 +234,7 @@ class BaseStep:
             The wrapped function that saves the data using the disk class.
         """
 
-        @wraps(self.pipe.disk_class.save)
+        @wraps(self.disk_class.save)
         def wrapper(session, data, extra=None):
             """Wrapper function to save data to disk.
 
@@ -262,7 +270,7 @@ class BaseStep:
             The wrapped function for loading disk objects.
         """
 
-        @wraps(self.pipe.disk_class.load)
+        @wraps(self.disk_class.load)
         def wrapper(session, extra=None, strict=False) -> Any:
             """Wrapper function to load disk object with session and optional extra parameters.
 
@@ -366,7 +374,7 @@ class BaseStep:
         """
         if extra is None:
             extra = self.get_default_extra()
-        return self.pipe.disk_class(session, self, extra)
+        return self.disk_class(session, self, extra)
 
     @property
     def generation_mechanism(self):

@@ -10,10 +10,12 @@ import inspect, hashlib
 from pandas import DataFrame
 
 from abc import ABCMeta, abstractmethod
+from copy import deepcopy
 
-from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING, Literal, Dict
+from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING, Literal, Dict, Set
 from types import MethodType
 
+from logging import getLogger
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -66,64 +68,95 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         Returns:
             None
         """
+        logger = getLogger("Pipe")
+
         self.pipeline = parent_pipeline
         self.pipe_name = to_snake_case(self.__class__.__name__)
+        # pipeline.pipes.pipe will thus work whatever if the object in pipelines.pipes is a step or a pipe
+        self.pipe = self
 
-        _steps: Dict[str, MethodType] = {}
+        step_methods: Set[MethodType] = set()
 
-        steps_members_scanner = inspect.getmembers(self, predicate=inspect.ismethod)
-        requires_is_step_attr = True
+        # first strategy, scans decorated methods that belongs to the pipe, and have an is_step attribute
+        # (decorated, directly in the pipe class)
+        for attribute_name, method in inspect.getmembers(self, predicate=inspect.ismethod):
+            if getattr(method, "is_step", False):
+                step_methods.add(method)
 
-        for class_name, class_object in inspect.getmembers(self, predicate=inspect.isclass):
-            if class_name == "Steps":
-                steps_members_scanner = inspect.getmembers(class_object(), predicate=inspect.ismethod)
-                requires_is_step_attr = False
+        # second strategy, scans the Steps pipe class, if existing, and get all of it's methods to make steps.
+        # (decorated or not, and grouped under Steps class, to differentiate them from non Step methods of the pipe)
+        for attribute_name, class_object in inspect.getmembers(self, predicate=inspect.isclass):
+            if attribute_name == "Steps":
+                for sub_attribute_name, method in inspect.getmembers(class_object(), predicate=inspect.ismethod):
+                    # if getattr(method, "is_step", False):
+                    step_methods.add(method)
                 break
 
-        # this loop populates self.steps dictionnary from the instanciated (bound) step methods.
-        for step_name, step in steps_members_scanner:
-            if not requires_is_step_attr or getattr(step, "is_step", False):
-                step_name = to_snake_case(step_name)
-                _steps[step_name] = step
+        # third strategy, by checking BaseStep inheriting classes defined in the Pipe
+        steps_classes: Set[Type[BaseStep]] = set()
+        for attribute_name, class_object in inspect.getmembers(self, predicate=inspect.isclass):
+            # The attribute Pipe.step_class is a child of BasePipe but we don't want to instantiate it as a step.
+            # It is meant to be used as a contructor class for making steps out of methods,
+            # #with first or second strategy
+            if attribute_name == "step_class":
+                continue
+            if issubclass(class_object, BaseStep):
+                steps_classes.add(class_object)
 
-        for step_name, step in inspect.getmembers(self, predicate=inspect.isclass):
-            if 
-
-        if len(_steps) < 1:
+        if len(steps_classes) + len(step_methods) < 1:
             raise ValueError(
-                f"You should register at least one step class with @stepmethod in {self.pipe_name} class. {_steps=}"
+                f"You should register at least one step in the pipe:{self.pipe_name} "
+                f"of the pipeline {self.pipeline.pipeline_name}. "
+                f"{step_methods=}, {steps_classes=}."
             )
 
-        # if len(_steps) > 1 and self.single_step:
-        #     raise ValueError(
-        #         f"Cannot set single_step to True if you registered more than one step inside {self.pipe_name} class."
-        #         f" { _steps = }"
-        #     )
+        self.steps = {}
+        # We instanciate decorated methods steps using the step_class defined in the pipe
+        for step_worker_method in step_methods:
+            logger.debug(f"defining {step_worker_method} from method in {self}")
+            instanciated_step = self.step_class(pipeline=self.pipeline, pipe=self, worker=step_worker_method)
+            self.attach_step(instanciated_step)
 
-        number_of_steps_with_requirements = 0
-        for step in _steps.values():
-            if len(getattr(step, "requires", [])):
-                number_of_steps_with_requirements += 1
+        # We instanciate class based steps using their class directly
+        for step_class in steps_classes:
+            logger.debug(f"defining {step_class} from class in {self}")
+            instanciated_step = step_class(pipeline=self.pipeline, pipe=self)
+            self.attach_step(instanciated_step)
 
-        if number_of_steps_with_requirements < len(_steps) - 1:
+        self.verify_hierarchical_requirements()
+
+    def verify_hierarchical_requirements(self):
+
+        number_of_steps_with_requirements = len([True for step in self.steps.values() if len(step.requires) != 0])
+
+        if number_of_steps_with_requirements < len(self.steps) - 1:
             raise ValueError(
                 "Steps of a single pipe must be linked in hierarchical order : Cannot have a single pipe with N steps"
                 " (N>1) and have no `requires` specification for at least N-1 steps."
             )
 
-        # this loop populates self.steps and replacs the bound methods with usefull Step objects.
-        # They must inherit from BaseStep
-        self.steps = {}
-        for step_name, step in _steps.items():
-            step = self.step_class(self.pipeline, self, step, step_name=step_name)  # , step_name)
-            self.steps[step_name] = step  # replace the bound_method by a step_class using that bound method,
-            # so that we attach the necessary components to it.
-            setattr(self, step_name, step)
+    def attach_step(self, instanciated_step: "BaseStep", rebind=False):
 
-        # below is just a syntaxic sugar to help in case the pipe is "single_step"
-        # so that we can access any pipe instance in pipeline with simple iteration on
-        # pipeline.pipes.pipe, whatever if the object in pipelines.pipes is a step or a pipe
-        self.pipe = self
+        if rebind:
+            instanciated_step = deepcopy(instanciated_step)
+            instanciated_step.pipeline = self.pipeline
+            instanciated_step.pipe = self.pipe
+            # TODO : eventually scan requirements strings / objects to rebind
+            # TODO : them to the local pipeline correspunding objects
+
+        if not hasattr(instanciated_step, "disk_class"):
+            instanciated_step.disk_class = self.disk_class
+
+        if instanciated_step.step_name in self.steps.keys():
+            raise AttributeError(
+                "Cannot attach two steps of the same name via different methods to a single pipe."
+                f" The step named {instanciated_step.step_name} is attached through two "
+                "mechanisms or has two methods with conflicting names."
+            )
+
+        self.steps[instanciated_step.step_name] = instanciated_step
+        setattr(self, instanciated_step.step_name, instanciated_step)
+        self.pipeline.resolved = False
 
     @property
     def version(self):
