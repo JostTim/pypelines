@@ -177,7 +177,7 @@ def test_pypeline_call(request, pipeline_fixture_name: str, session):
 def test_pypeline_requirement_stack(request, pipeline_fixture_name: str, session):
     pipeline: Pipeline = request.getfixturevalue(pipeline_fixture_name)
 
-    # before being resolved (called)
+    # before being resolved (called), requires is a list of string
     assert pipeline.complex_pipe.another_name.requires == ["complex_pipe.my_step_name"]
 
     # expect no result is present on disk because we didn't check_requirements
@@ -185,3 +185,6 @@ def test_pypeline_requirement_stack(request, pipeline_fixture_name: str, session
         pipeline.complex_pipe.another_name.generate(session)
 
     assert pipeline.complex_pipe.another_name.generate(session, check_requirements=True) == 54
+
+    # now, requires has been resolved and contains instanciated step objects
+    assert pipeline.complex_pipe.another_name.requires == [pipeline.complex_pipe.my_step_name]
