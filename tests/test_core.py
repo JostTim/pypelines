@@ -10,8 +10,8 @@ import pytest
 from pypelines import examples
 from pypelines.sessions import Session
 
-from pypelines import Pipeline, stepmethod, BaseStep
-from pypelines.pickle_backend import PicklePipe
+from pypelines import Pipeline, stepmethod, BaseStep, BasePipe
+from pypelines.pickle_backend import PicklePipe, PickleDiskObject
 
 from pathlib import Path
 
@@ -27,6 +27,18 @@ def pipeline_method_based():
         @stepmethod(requires=[])
         def my_step(self, session, extra=""):
             return "a_good_result"
+
+    @test_pipeline.register_pipe
+    class complex_pipe(BasePipe):
+
+        @stepmethod(disk_class=PickleDiskObject)
+        def my_step_name(self, session, extra=""):
+            return 154
+
+        @stepmethod(requires="complex_pipe.my_step_name", disk_class=PickleDiskObject)
+        def another_name(self, session, extra=""):
+            data = self.load_requirement("complex_pipe", session, extra=extra)
+            return data - 100
 
     return test_pipeline
 
@@ -44,6 +56,21 @@ def pipeline_steps_group_class_based():
 
             my_step.requires = []
 
+    @test_pipeline.register_pipe
+    class complex_pipe(BasePipe):
+
+        class Steps:
+            @stepmethod(disk_class=PickleDiskObject)
+            def my_step_name(self, session, extra=""):
+                return 154
+
+            def another_name(self, session, extra=""):
+                data = self.load_requirement("complex_pipe", session, extra=extra)
+                return data - 100
+
+            another_name.requires = "complex_pipe.my_step_name"
+            another_name.disk_class = PickleDiskObject
+
     return test_pipeline
 
 
@@ -58,6 +85,27 @@ def pipeline_class_based():
         class MyStep(BaseStep):
             def worker(self, session, extra=""):
                 return "a_good_result"
+
+    @test_pipeline.register_pipe
+    class MyComplexPipe(BasePipe):
+
+        pipe_name = "complex_pipe"
+
+        class MyStep(BaseStep):
+            def worker(self, session, extra=""):
+                return 154
+
+            disk_class = PickleDiskObject
+            step_name = "my_step_name"
+
+        class MyStep2(BaseStep):
+            def worker(self, session, extra=""):
+                data = self.load_requirement("complex_pipe", session, extra=extra)
+                return data - 100
+
+            step_name = "another_name"
+            requires = "complex_pipe.my_step_name"
+            disk_class = PickleDiskObject
 
     return test_pipeline
 
@@ -105,7 +153,7 @@ def test_pypeline_creation(request, pipeline_fixture_name):
 
 @pytest.mark.parametrize("pipeline_fixture_name", get_pipelines_fixtures())
 def test_pypeline_call(request, pipeline_fixture_name: str, session):
-    pipeline = request.getfixturevalue(pipeline_fixture_name)
+    pipeline: Pipeline = request.getfixturevalue(pipeline_fixture_name)
 
     # expecting the output to not be present if the pipeline step was not generated first
     with pytest.raises(ValueError):
@@ -123,3 +171,17 @@ def test_pypeline_call(request, pipeline_fixture_name: str, session):
 
     # expecting the output to be present now
     assert pipeline.my_pipe.my_step.load(session) == "a_good_result"
+
+
+@pytest.mark.parametrize("pipeline_fixture_name", get_pipelines_fixtures())
+def test_pypeline_requirement_stack(request, pipeline_fixture_name: str, session):
+    pipeline: Pipeline = request.getfixturevalue(pipeline_fixture_name)
+
+    # before being resolved (called)
+    assert pipeline.complex_pipe.another_name.requires == ["complex_pipe.my_step_name"]
+
+    # expect no result is present on disk because we didn't check_requirements
+    with pytest.raises(ValueError):
+        pipeline.complex_pipe.another_name.generate(session)
+
+    assert pipeline.complex_pipe.another_name.generate(session, check_requirements=True) == 54

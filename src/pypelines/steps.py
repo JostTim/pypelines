@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .tasks import BaseStepTaskManager
 
 
-def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]):
+def stepmethod(requires=None, version=None, do_dispatch=None, on_save_callbacks=None, disk_class=None, step_name=None):
     """Wrapper to attach some attributes to a method of a pipeline's pipe. These methods are necessary to trigger the
     pipeline creation mechanism on that step_method after the pipe has been fully defined.
 
@@ -53,12 +53,20 @@ def stepmethod(requires=[], version=None, do_dispatch=True, on_save_callbacks=[]
             Callable: The registered function with additional attributes such as 'requires', 'is_step', 'version',
                 'do_dispatch', 'step_name', and 'callbacks'.
         """
-        function.requires = [requires] if not isinstance(requires, list) else requires
         function.is_step = True
-        function.version = version
-        function.do_dispatch = do_dispatch
-        function.step_name = to_snake_case(function.__name__)
-        function.callbacks = [on_save_callbacks] if not isinstance(on_save_callbacks, list) else on_save_callbacks
+
+        if requires is not None:
+            function.requires = requires
+        if version is not None:
+            function.version = version
+        if do_dispatch is not None:
+            function.do_dispatch = do_dispatch
+        if step_name is not None:
+            function.step_name = step_name
+        if on_save_callbacks is not None:
+            function.callbacks = on_save_callbacks
+        if disk_class is not None:
+            function.disk_class = disk_class
         return function
 
     return registrate
@@ -68,7 +76,7 @@ class BaseStep:
 
     step_name: str
 
-    requires: List["BaseStep"]
+    requires: List["BaseStep"] | List[str] | str
     version: str | int
     do_dispatch: bool
     callbacks: List[Callable]
@@ -112,11 +120,24 @@ class BaseStep:
 
         # we attach the values of the worker elements to the Step
         # as they are get only (no setter) on worker if it is not None (bound method)
-        self.do_dispatch = self.get_attribute_or_default("do_dispatch", False)
+        self.do_dispatch = self.get_attribute_or_default("do_dispatch", True)
+
         self.version = self.get_attribute_or_default("version", 0)
+
         self.requires = self.get_attribute_or_default("requires", [])
+        self.requires = [self.requires] if not isinstance(self.requires, list) else self.requires
+
+        self.disk_class = self.get_attribute_or_default("disk_class", getattr(self.pipe, "disk_class"))
+        if self.disk_class is None:
+            raise AttributeError(
+                f"disk_class of step {self.step_name} should be : \n"
+                " - defined through decorator\n"
+                " - defined with the disk_class attribute of the Step\n"
+                " - defined with the disk_class attribute of the Pipe class that the Step is bound to\n"
+            )
 
         self.callbacks = self.get_attribute_or_default("callbacks", [])
+        self.callbacks = [self.callbacks] if not isinstance(self.callbacks, list) else self.callbacks
 
         # self.make_wrapped_functions()
 

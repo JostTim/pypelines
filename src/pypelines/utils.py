@@ -1,7 +1,7 @@
 import re
 
 
-def to_snake_case(text):
+def to_snake_case(text: str):
     # Replace spaces or hyphens with underscores
     text = re.sub(r"[\s-]+", "_", text)
     # Convert CamelCase to snake_case

@@ -37,6 +37,8 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
     disk_class: Type[BaseDiskObject] = BaseDiskObject
     multisession_class: Type[BaseMultisessionAccessor] = BaseMultisessionAccessor
 
+    pipe_name: str
+
     steps: Dict[str, BaseStep]
 
     def __init__(self, parent_pipeline: "Pipeline") -> None:
@@ -70,8 +72,14 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         """
         logger = getLogger("Pipe")
 
+        self.pipe_name = (
+            to_snake_case(self.pipe_name)
+            if getattr(self, "pipe_name", None) is not None
+            else to_snake_case(self.__class__.__name__)
+        )
+
         self.pipeline = parent_pipeline
-        self.pipe_name = to_snake_case(self.__class__.__name__)
+
         # pipeline.pipes.pipe will thus work whatever if the object in pipelines.pipes is a step or a pipe
         self.pipe = self
 
@@ -143,9 +151,6 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
             instanciated_step.pipe = self.pipe
             # TODO : eventually scan requirements strings / objects to rebind
             # TODO : them to the local pipeline correspunding objects
-
-        if not hasattr(instanciated_step, "disk_class"):
-            instanciated_step.disk_class = self.disk_class
 
         if instanciated_step.step_name in self.steps.keys():
             raise AttributeError(
