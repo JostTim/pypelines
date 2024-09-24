@@ -168,7 +168,12 @@ class BaseDiskObject(metaclass=ABCMeta):
             str: A message describing the status of the object, including loadability, deprecation, step level,
                 and found disk object description.
         """
-        loadable_disk_message = "A disk object is loadable. " if self.is_loadable() else ""
+
+        session = self.session.alias
+        step = self.step.complete_name
+        extra = str(self.extra) if self.extra is not None else ""
+
+        loadable_disk_message = "Disk object for A disk object is loadable. " if self.is_loadable() else ""
         deprecated_disk_message = (
             f"This object's version is {'deprecated' if self.version_deprecated() else 'the current one'}. "
         )
@@ -189,7 +194,7 @@ class BaseDiskObject(metaclass=ABCMeta):
             else ""
         )
         return (
-            f"{self.object_name} object has {'a' if self.is_matching() else 'no'} valid disk object found."
+            f"{self.object_name} object has {'a' if self.is_matching() else 'no'} valid disk object found.\n"
             f" {found_disk_object_description}{loadable_disk_message}"
         )
 

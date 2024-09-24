@@ -122,7 +122,7 @@ class BaseStep:
         # as they are get only (no setter) on worker if it is not None (bound method)
         self.do_dispatch = self.get_attribute_or_default("do_dispatch", True)
 
-        self.version = self.get_attribute_or_default("version", 0)
+        self.version = self.get_attribute_or_default("version", None)
 
         self.requires = self.get_attribute_or_default("requires", [])
         self.requires = [self.requires] if not isinstance(self.requires, list) else self.requires
