@@ -1,5 +1,5 @@
-from functools import wraps, partial, update_wrapper
-from .loggs import loggedmethod, NAMELENGTH
+from functools import wraps, partial, update_wrapper, cache
+from .loggs import loggedmethod, NAMELENGTH, getLogger, PypelineLogger
 from .arguments import autoload_arguments
 from .utils import to_snake_case
 
@@ -212,7 +212,7 @@ class BaseStep:
 
     def __call__(self, *args, **kwargs):
         """Call the worker method with the given arguments and keyword arguments."""
-        return self.worker(*args, **kwargs)
+        return loggedmethod(self.worker)(*args, **kwargs)
 
     def __repr__(self):
         """Return a string representation of the StepObject in the format: "<pipe_name.step_name StepObject>"."""
@@ -720,7 +720,7 @@ class BaseStep:
             return False
         return True
 
-    def load_requirement(self, pipe_name, session, extra=None):
+    def load_requirement(self, pipe_name, session, extra=None, **kwargs) -> Any:
         """Load the specified requirement step for the given pipe name.
 
         Args:
@@ -734,6 +734,10 @@ class BaseStep:
         Raises:
             IndexError: If the required step with the specified pipe name is not found in the requirement stack.
         """
+
+        if pipe_name in kwargs.keys():
+            return kwargs[pipe_name]
+
         try:
             req_step = [step for step in self.requirement_stack() if step.pipe_name == pipe_name][-1]
         except IndexError as e:
@@ -766,6 +770,10 @@ class BaseStep:
             NotImplementedError: This method must be implemented in a subclass.
         """
         raise NotImplementedError
+
+    @property
+    def logger(self) -> PypelineLogger:
+        return getLogger(self.step_name[:NAMELENGTH])
 
 
 @dataclass

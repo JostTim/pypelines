@@ -27,7 +27,7 @@ class BasePipeType(Protocol):
 
 
 class BasePipe(BasePipeType, metaclass=ABCMeta):
-    # this class must implements only the logic to link steps together.
+    # this class implements only the logic to link steps together.
 
     default_extra = None
 
@@ -164,7 +164,7 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         self.pipeline.resolved = False
 
     @property
-    def version(self):
+    def version(self) -> str:
         """Return a hash representing the versions of all steps in the object.
 
         Returns:
