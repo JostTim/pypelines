@@ -6,6 +6,9 @@ import pickle, natsort, os, re, logging
 import pandas as pd
 
 
+IGNORE_VERSIONS = False
+
+
 class PickleDiskObject(BaseDiskObject):
     collection = ["preprocessing_saves"]  # collection a.k.a subfolders in the session.path
     extension = "pickle"
@@ -36,6 +39,9 @@ class PickleDiskObject(BaseDiskObject):
             bool: True if the current version is deprecated, False otherwise.
         """
         logger = logging.getLogger("pickle.version_deprecated")
+
+        if IGNORE_VERSIONS:
+            return False
 
         # if we didn't found the disk version, we return False.
         # it's not labeled as "deprecated" for retro-compatibility
