@@ -834,7 +834,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             logger.error(f"No handshake result. All workers are busy ? {e}")
             return False
 
-    def single_worker_start(self: Celery):
+    def single_worker_start(self: "Celery"):
         thread = CeleryWorkerThread(self)
         thread.start()
 
@@ -909,7 +909,7 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
 
 class CeleryWorkerThread(Thread):
-    def __init__(self, app: Celery):
+    def __init__(self, app: "Celery"):
         super().__init__()
         self.app = app
 
