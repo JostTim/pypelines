@@ -775,6 +775,34 @@ class BaseStep:
     def logger(self) -> PypelineLogger:
         return getLogger(self.step_name[:NAMELENGTH])
 
+    def __eq__(self, other_step: "BaseStep"):
+        if self.complete_name == other_step.complete_name:
+            return True
+        return False
+
+    def __lt__(self, other_step: "BaseStep"):  # Less than (<)
+        if self.pipe != other_step.pipe:
+            raise ArithmeticError("Cannot compare two steps of different pipes with <")
+        return self.get_level(selfish=True) < other_step.get_level(selfish=True)
+
+    def __le__(self, other_step: "BaseStep"):  # Less than or equal (<=)
+        if self.pipe != other_step.pipe:
+            raise ArithmeticError("Cannot compare two steps of different pipes with <=")
+        return self.get_level(selfish=True) <= other_step.get_level(selfish=True)
+
+    def __gt__(self, other_step: "BaseStep"):  # Greater than (>)
+        if self.pipe != other_step.pipe:
+            raise ArithmeticError("Cannot compare two steps of different pipes with >")
+        return self.get_level(selfish=True) > other_step.get_level(selfish=True)
+
+    def __ge__(self, other_step: "BaseStep"):  # Greater than or equal (>=)
+        if self.pipe != other_step.pipe:
+            raise ArithmeticError("Cannot compare two steps of different pipes with >=")
+        return self.get_level(selfish=True) >= other_step.get_level(selfish=True)
+
+    def __hash__(self) -> int:
+        return hash(self.complete_name)
+
 
 @dataclass
 class StepLevel:

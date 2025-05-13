@@ -287,3 +287,11 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
             return highest_step.load(session, extra)
 
         raise ValueError(f"Could not find a {self} object to load for the session {session.alias} with extra {extra}")
+
+    def __eq__(self, other_pipe: "BasePipe"):
+        if hash(self) == hash(other_pipe):
+            return True
+        return False
+
+    def __hash__(self):
+        return hash(f"{self.pipeline.pipeline_name}.{self.pipe_name}")
