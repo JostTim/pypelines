@@ -1,4 +1,4 @@
-__version__ = "0.0.80"
+__version__ = "0.0.81"
 
 from . import loggs
 from .pipes import *
@@ -6,6 +6,8 @@ from .pipelines import *
 from .steps import *
 from .disk import *
 from .sessions import *
+
+from .extend_pandas import extend_pandas
 
 # NOTE:
 # pypelines is enabling the logging system by default when importing it

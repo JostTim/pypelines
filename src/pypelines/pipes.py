@@ -245,6 +245,10 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         # the dispatcher must be return a wrapped function
         return function
 
+    def ordered_steps(self, first: Literal["lowest", "highest"] = "lowest"):
+        reverse = False if first == "lowest" else True
+        return sorted(list(self.steps.values()), key=lambda item: item.get_level(selfish=True), reverse=reverse)
+
     def load(self, session, extra="", which: Literal["lowest", "highest"] = "highest"):
         """Load a step object for a session with optional extra data.
 
@@ -260,20 +264,14 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
         Raises:
             ValueError: If no matching step object is found for the session.
         """
-        if which == "lowest":
-            reverse = False
-        else:
-            reverse = True
 
-        ordered_steps = sorted(
-            list(self.steps.values()), key=lambda item: item.get_level(selfish=True), reverse=reverse
-        )
+        ordered_steps = self.ordered_steps(first=which)
 
         highest_step = None
 
         if isinstance(session, DataFrame):
             # if multisession, we assume we are trying to just load sessions
-            # that all have reached the same level of requirements. (otherwise, use generate)
+            # that all have reached the same level of requirements. (otherwise, use generate to make them match levels)
             # because of that, we use only the first session in the lot to search the highest loadable step
             search_on_session = session.iloc[0]
         else:
