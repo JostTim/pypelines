@@ -2,6 +2,7 @@
 
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FJostTim%2Fpypelines%2Frefs%2Fheads%2Fmain%2Fpyproject.toml)
 [![PyPI - Version](https://img.shields.io/pypi/v/processing_pypelines)](https://pypi.org/project/processing-pypelines/)
+[![GitHub Actions Tests Status](https://img.shields.io/github/actions/workflow/status/JostTim/pypelines/test.yml?label=Testing)](https://github.com/JostTim/pypelines/actions/workflows/test.yml/)
 [![codecov](https://codecov.io/gh/JostTim/pypelines/graph/badge.svg?token=372VJ9SGNU)](https://codecov.io/gh/JostTim/pypelines)
 [![pdm-managed](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fpdm-project%2F.github%2Fbadge.json)](https://pdm-project.org)
 
