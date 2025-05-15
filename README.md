@@ -47,6 +47,7 @@ The most usefull parts that this package allows you do to is :
 
 To implement a Pipeline, you have to define at least a Step, attached inside a Pipe.
 Here is a simple example.
+In only 70 lines of code, it allows to perform the automatic chaining for 4 Steps, loading and writing of intermediate processing outputs, without the developper requiring to take care for any of it.
 You can test this example, and see the result on your own computer. (Two csv files located in the ``test/data`` folder of this repository will be used for demonstration purposes.)
 
 ```python
