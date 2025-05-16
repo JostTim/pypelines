@@ -1,0 +1,74 @@
+site_name: Pypelines
+site_url: https://josttim.github.io/pypelines/
+docs_dir: "./documentation"
+repo_url: https://github.com/JostTim/pypelines
+repo_name: Pypelines
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: teal
+      accent: deep purple
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      primary: teal
+      accent: deep purple
+      scheme: default
+
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: teal
+      accent: deep purple
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.tabs.link
+    - navigation.path
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tracking
+    - content.code.copy
+    - content.tooltips
+    - header.permalinks
+    - toc.follow
+
+markdown_extensions:
+  - attr_list
+  - abbr
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+  - tables
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+
+nav:
+  - Home: "index.md"
+
+exclude_docs: |
+  !.assets/
+
+extra_css:
+  - stylesheets/extra.css

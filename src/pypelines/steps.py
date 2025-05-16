@@ -179,7 +179,7 @@ class BaseStep:
         return step_name
 
     @property
-    def requirement_stack(self) -> Callable:
+    def requirement_stack(self) -> "Callable[[], List[BaseStep]]":
         """Return a partial function that calls the get_requirement_stack method of the pipeline
         attribute with the instance set to self.
         """
@@ -507,7 +507,7 @@ class BaseStep:
                             f"File exists for {self.relative_name}{'.' + extra if extra else ''}."
                             " Loading and processing will be skipped"
                         )
-                        if not check_requirements or refresh_requirements is not False:
+                        if not check_requirements:
                             return None
 
                         # if we should skip but check_requirements is True, we just postpone the skip to after
@@ -548,6 +548,20 @@ class BaseStep:
                 # if we want to regenerate all, we start from the bottom of the requirement stack and move up,
                 # forcing generation with refresh true on all the steps along the way.
                 logger.info("Checking the requirements")
+
+                # decide if we will refresh every required step, if refresh_requirements was set to True
+                if refresh_requirements == True:
+                    always_refresh = True
+                else:
+                    always_refresh = False
+
+                # Make sure refresh_requirements is a list so that we can check if steps match elements in it with 'in'
+                if not isinstance(refresh_requirements, list):
+                    if isinstance(refresh_requirements, bool):
+                        refresh_requirements = []
+                    else:
+                        refresh_requirements = [refresh_requirements]
+
                 for step in self.requirement_stack():
                     if self.pipe.pipe_name == step.pipe.pipe_name:
                         _extra = extra
@@ -555,20 +569,18 @@ class BaseStep:
                         _extra = step.pipe.default_extra
 
                     # by default, we don't refresh the step
-                    _refresh = False
-
-                    # if this is true, refresh_requirements is either True or a list of strings
-                    if bool(refresh_requirements):
-                        # then, by default, we refresh the step.
-                        _refresh = True
-                        # if refresh_requirements is not True but a list of steps we should refresh,
-                        # we parse it here to not refresh it if it is not included in the list of strings
-                        if isinstance(refresh_requirements, list):
-                            _refresh = (
-                                True
-                                if step.pipe_name in refresh_requirements or step.relative_name in refresh_requirements
-                                else False
-                            )
+                    # however, if refresh_requirements was set to True,
+                    # or a list of string that contains a reference to the pipe or pipe.step (relative_name)
+                    # that matches the current dependancy step, then we refresh it
+                    _refresh = (
+                        True
+                        if (
+                            always_refresh
+                            or step.pipe_name in refresh_requirements
+                            or step.relative_name in refresh_requirements
+                        )
+                        else False
+                    )
 
                     # if the step is not refreshed, we skip it so that check_requirements doesn't trigger if
                     # it is found and we don't load the data (process goes faster this way)
