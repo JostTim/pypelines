@@ -5,7 +5,7 @@
 groups = ["default", "dev", "docs"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:3346458cd585396d29e70e372c6e28445bf85beecb930a1d4a75a20b136de8e4"
+content_hash = "sha256:87643da6865b57d585dc69e03241a8fdcea8974506d273a55be77e01633c49dd"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -799,6 +799,20 @@ groups = ["docs"]
 files = [
     {file = "mkdocs_material_extensions-1.3.1-py3-none-any.whl", hash = "sha256:adff8b62700b25cb77b53358dad940f3ef973dd6db797907c49e3c2ef3ab4e31"},
     {file = "mkdocs_material_extensions-1.3.1.tar.gz", hash = "sha256:10c9511cea88f568257f960358a467d12b970e1f7b2c0e5fb2bb48cab1928443"},
+]
+
+[[package]]
+name = "mkdocs-plugin-inline-svg"
+version = "0.1.0"
+requires_python = ">=3.5"
+summary = "A MkDocs plugin that inlines SVG images into the output."
+groups = ["docs"]
+dependencies = [
+    "mkdocs",
+]
+files = [
+    {file = "mkdocs-plugin-inline-svg-0.1.0.tar.gz", hash = "sha256:30753efd1769ad68aade76c95382695ef2b9b153ed765167d5137f7bb6c85130"},
+    {file = "mkdocs_plugin_inline_svg-0.1.0-py3-none-any.whl", hash = "sha256:a5aab2d98a19b24019f8e650f54fc647c2f31e7d0e36fc5cf2d2161acc0ea49a"},
 ]
 
 [[package]]

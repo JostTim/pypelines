@@ -34,6 +34,7 @@ documentation = "https://gitlab.pasteur.fr/haisslab/data-management/pypelines"
 celery = ["celery>=5.3.5", "alyx_connector>=2.1.5"]
 docs = [
     "mkdocs-material>=9.6.14",
+    "mkdocs-plugin-inline-svg>=0.1.0",
 ]
 
 [tool.pdm.dev-dependencies]

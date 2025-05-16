@@ -64,6 +64,9 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.inlinehilite
 
+plugins:
+  - inline-svg
+
 nav:
   - Home: "index.md"
 

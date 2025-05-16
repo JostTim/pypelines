@@ -118,7 +118,7 @@ trials_roi_df = pipeline.trials_rois_df.merge.generate(session=session, check_re
 
 ### Generation Mechanism
 
-![generation_flowchart](\.assets\PypelinesGenerate.svg)
+![generation_flowchart](./.assets/PypelinesGenerate.svg)
 
 1. Inputs to Generate:
 

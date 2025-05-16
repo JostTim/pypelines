@@ -3,16 +3,15 @@ article img {
     border-radius: 4px;
 }
 
-/* Remove shadow for SVG images */
-article img[src$=".svg"] {
-    box-shadow: none;
-}
-
 article a img:hover {
     box-shadow: 0 0px 6px rgba(0, 0, 0, 0.30);
 }
 
-/* Remove shadow on hover for SVG images */
-article a img[src$=".svg"]:hover {
-    box-shadow: none;
+article svg {
+    border-radius: 4px;
+    filter: drop-shadow(0 0px 4px rgba(0, 0, 0, 0.15));
+}
+
+article a svg:hover {
+    filter: drop-shadow(0 0px 6px rgba(0, 0, 0, 0.30));
 }
