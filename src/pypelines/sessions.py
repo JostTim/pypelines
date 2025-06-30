@@ -1,4 +1,3 @@
-from . import accessors
 import pandas as pd, os
 
 
@@ -32,6 +31,7 @@ class Session(pd.Series):
         Returns:
             pd.Series: The modified series with the specified attributes.
         """
+
         if series is None:
             series = pd.Series()
 

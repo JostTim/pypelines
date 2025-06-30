@@ -2,7 +2,7 @@ from logging import getLogger
 import os
 from .tasks import BaseTaskBackend
 
-from typing import Callable, Type, Dict, List, Iterable, Protocol, TYPE_CHECKING
+from typing import Callable, Type, Dict, List, Iterable, Protocol, TYPE_CHECKING, cast, overload
 
 if TYPE_CHECKING:
     from .pipes import BasePipe
@@ -109,9 +109,19 @@ class Pipeline:
             return self.pipes[name]
         raise AttributeError(f"'Pipeline' object has no attribute '{name}'")
 
+    @overload
     def get_requirement_stack(
         self, instance: "BaseStep", names: bool = False, max_recursion: int = 100
-    ) -> List["BaseStep"]:
+    ) -> List["BaseStep"]: ...
+
+    @overload
+    def get_requirement_stack(
+        self, instance: "BaseStep", names: bool = True, max_recursion: int = 100
+    ) -> List[str]: ...
+
+    def get_requirement_stack(
+        self, instance: "BaseStep", names: bool = False, max_recursion: int = 100
+    ) -> "List[BaseStep] | List[str]":
         """Returns a list containing the ordered Steps that the "instance" Step object requires for being ran.
 
         Args:
@@ -128,8 +138,8 @@ class Pipeline:
         """
 
         self.resolve()  # ensure requires lists are containing instances and not strings
-        parents: List["BaseStep"] = []
-        required_steps = []
+        parents: "List[BaseStep]" = []
+        required_steps: "List[BaseStep]" = []
 
         def recurse_requirement_stack(
             instance: "BaseStep",
@@ -156,7 +166,7 @@ class Pipeline:
                     " max_recursion"
                 )
 
-            for requirement in instance.requires:
+            for requirement in cast("list[BaseStep]", instance.requires):
                 recurse_requirement_stack(requirement)
                 if requirement not in required_steps:
                     required_steps.append(requirement)
@@ -164,8 +174,8 @@ class Pipeline:
             parents.pop(-1)
 
         recurse_requirement_stack(instance)
-        if names:
-            required_steps = [req.relative_name for req in required_steps]
+        if names:  # return a list of names in that case
+            return [req.relative_name for req in required_steps]
         return required_steps
 
     @property

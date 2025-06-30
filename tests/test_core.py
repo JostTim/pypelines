@@ -9,11 +9,13 @@ import pytest
 
 from pypelines import examples
 from pypelines.sessions import Session
-
 from pypelines import Pipeline, stepmethod, BaseStep, BasePipe
 from pypelines.pickle_backend import PicklePipe, PickleDiskObject
+import pypelines
 
 from pathlib import Path
+
+pypelines.extend_pandas()
 
 
 @pytest.fixture

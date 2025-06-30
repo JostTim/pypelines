@@ -8,7 +8,7 @@ from pandas import DataFrame
 from dataclasses import dataclass
 
 from types import MethodType
-from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any, Optional
+from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
