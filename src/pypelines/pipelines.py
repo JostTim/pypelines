@@ -1,5 +1,6 @@
 from logging import getLogger
-import os
+import textwrap
+
 from .tasks import BaseTaskBackend
 
 from typing import Callable, Type, Dict, List, Iterable, Protocol, TYPE_CHECKING, cast, overload
@@ -13,8 +14,9 @@ if TYPE_CHECKING:
 class Pipeline:
     pipes: Dict[str, "BasePipe"]
     runner_backend_class = BaseTaskBackend
+    runner_backend = None
 
-    def __init__(self, name: str, **runner_args):
+    def __init__(self, name: str):
         """Initialize the pipeline with the given name and runner arguments.
 
         Args:
@@ -34,6 +36,9 @@ class Pipeline:
 
         # create a runner backend, if fails, the runner_backend object evaluates to False as a boolean
         # (to be checked and used througout the pipeline wrappers creation)
+        # self.runner_backend = self.runner_backend_class(self, **runner_args)
+
+    def initialize_backend(self, **runner_args):
         self.runner_backend = self.runner_backend_class(self, **runner_args)
 
     def register_pipe(self, pipe_class: Type["BasePipe"]) -> Type["BasePipe"]:
@@ -184,3 +189,18 @@ class Pipeline:
         from .graphs import PipelineGraph
 
         return PipelineGraph(self)
+
+    def help(self, header=True, details=True):
+        doc = inspect.getdoc(self.__class__)
+        if not doc:
+            return ""
+        lines = doc.splitlines()
+        header_line = lines[0].strip() if lines else ""
+        details_lines = lines[1:] if len(lines) > 1 else []
+        details_text = textwrap.dedent("\n".join(details_lines)).strip()
+        parts = []
+        if header and header_line:
+            parts.append(header_line)
+        if details and details_text:
+            parts.append(details_text)
+        return "\n\n".join(parts)

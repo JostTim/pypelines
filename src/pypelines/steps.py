@@ -6,6 +6,7 @@ from .utils import to_snake_case
 import logging, inspect
 from pandas import DataFrame
 from dataclasses import dataclass
+import textwrap
 
 from types import MethodType
 from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any, Optional, cast
@@ -143,7 +144,8 @@ class BaseStep:
 
         self.multisession = self.pipe.multisession_class(self)
 
-        self.task = self.pipeline.runner_backend.create_task_manager(self)
+        if self.pipeline.runner_backend:
+            self.task = self.pipeline.runner_backend.create_task_manager(self)
 
     def get_attribute_or_default(self, attribute_name: str, default: Any) -> Any:
         return getattr(self, attribute_name, getattr(self.worker, attribute_name, default))
@@ -814,6 +816,21 @@ class BaseStep:
 
     def __hash__(self) -> int:
         return hash(self.complete_name)
+
+    def help(self, header=True, details=True):
+        doc = inspect.getdoc(self.__class__)
+        if not doc:
+            return ""
+        lines = doc.splitlines()
+        header_line = lines[0].strip() if lines else ""
+        details_lines = lines[1:] if len(lines) > 1 else []
+        details_text = textwrap.dedent("\n".join(details_lines)).strip()
+        parts = []
+        if header and header_line:
+            parts.append(header_line)
+        if details and details_text:
+            parts.append(details_text)
+        return "\n\n".join(parts)
 
 
 @dataclass

@@ -12,6 +12,7 @@ from pandas import DataFrame
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
+import textwrap
 from typing import Callable, Type, Iterable, Protocol, TYPE_CHECKING, Literal, Dict, Set
 from types import MethodType
 
@@ -287,6 +288,21 @@ class BasePipe(BasePipeType, metaclass=ABCMeta):
             return highest_step.load(session, extra)
 
         raise ValueError(f"Could not find a {self} object to load for the session {session.alias} with extra {extra}")
+
+    def help(self, header=True, details=True):
+        doc = inspect.getdoc(self.__class__)
+        if not doc:
+            return ""
+        lines = doc.splitlines()
+        header_line = lines[0].strip() if lines else ""
+        details_lines = lines[1:] if len(lines) > 1 else []
+        details_text = textwrap.dedent("\n".join(details_lines)).strip()
+        parts = []
+        if header and header_line:
+            parts.append(header_line)
+        if details and details_text:
+            parts.append(details_text)
+        return "\n\n".join(parts)
 
     def __eq__(self, other_pipe: "BasePipe"):
         if hash(self) == hash(other_pipe):
