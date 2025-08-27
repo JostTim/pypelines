@@ -1,4 +1,5 @@
 import os, re
+from pathlib import Path
 from .sessions import Session
 import pickle
 
@@ -413,6 +414,7 @@ class FlaggedDiskObject(BaseDiskObject):
     def save(self, data):
         if self.step_supports_flagging():
             flagpath = self.get_flag_path(self.step)
+            Path(flagpath).parent.mkdir(exist_ok=True, parents=True)
             with open(flagpath, "w"):
                 return
 
@@ -452,8 +454,7 @@ class FlaggedDiskObject(BaseDiskObject):
 
 
 class CachedFlaggedDiskObject(CachedDiskObject, FlaggedDiskObject):
-    """
-    Behaves like a CachedDiskObject, but also supports flagging.
+    """Behaves like a CachedDiskObject, but also supports flagging.
     - If cache is available, loads from cache (priority).
     - If not, but a flag is found for a step >= current, loads flag (skips running).
     - If neither, triggers computation.

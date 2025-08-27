@@ -1,10 +1,10 @@
 from .pipes import BasePipe
 from .steps import BaseStep
 from .disk import BaseDiskObject
+from .loggs import getLogger
 
-import pickle, natsort, os, re, logging
+import pickle, natsort, os, re
 import pandas as pd
-
 
 IGNORE_VERSIONS = False
 
@@ -38,7 +38,7 @@ class PickleDiskObject(BaseDiskObject):
         Returns:
             bool: True if the current version is deprecated, False otherwise.
         """
-        logger = logging.getLogger("pickle.version_deprecated")
+        logger = getLogger("pickle.version_deprecated")
 
         if IGNORE_VERSIONS:
             return False
@@ -65,7 +65,7 @@ class PickleDiskObject(BaseDiskObject):
         Returns:
             bool: True if the disk step level is lower than the current step level, False otherwise.
         """
-        logger = logging.getLogger("pickle.step_level_too_low")
+        logger = getLogger("pickle.step_level_too_low")
 
         # we get the step instance that corresponds to the one on the disk
         disk_step = self.disk_step_instance()
@@ -160,7 +160,7 @@ class PickleDiskObject(BaseDiskObject):
         Returns:
             bool: True if a matching file is found, False otherwise.
         """
-        logger = logging.getLogger("pickle.check_disk")
+        logger = getLogger("pickle.check_disk")
 
         search_path = os.path.join(self.session.path, os.path.sep.join(self.collection))
         pattern = self.make_file_name_pattern()
@@ -240,7 +240,7 @@ class PickleDiskObject(BaseDiskObject):
         Returns:
             None
         """
-        logger = logging.getLogger("PickleDiskObject.save")
+        logger = getLogger("PickleDiskObject.save")
         new_full_path = self.get_full_path()
         logger.debug(f"Saving to path : {new_full_path}")
 
@@ -266,7 +266,7 @@ class PickleDiskObject(BaseDiskObject):
         Returns:
             The loaded data from the disk file.
         """
-        logger = logging.getLogger("PickleDiskObject.load")
+        logger = getLogger("PickleDiskObject.load")
         logger.debug(f"Current disk file status : {self.current_disk_file=}")
         if self.current_disk_file is None:
             raise IOError(
