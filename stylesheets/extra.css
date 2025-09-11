@@ -1,0 +1,17 @@
+article img {
+    box-shadow: 0 0px 4px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+article a img:hover {
+    box-shadow: 0 0px 6px rgba(0, 0, 0, 0.30);
+}
+
+article svg {
+    border-radius: 4px;
+    filter: drop-shadow(0 0px 4px rgba(0, 0, 0, 0.15));
+}
+
+article a svg:hover {
+    filter: drop-shadow(0 0px 6px rgba(0, 0, 0, 0.30));
+}
