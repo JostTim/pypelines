@@ -2,6 +2,11 @@ from functools import wraps
 from logging import getLogger
 import json, re, os
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .steps import BaseStep
+
 
 def read_json_file(json_file: str):
     """Loads a Json file that can have some comments indicated with // after a line.
@@ -97,7 +102,7 @@ def autoload_arguments(wrapped_function, step):
     return wrapper
 
 
-def get_step_arguments(session, step):
+def get_step_arguments(session, step: "BaseStep"):
     """Get the arguments for a specific step from the session's arguments file.
 
     Args:
