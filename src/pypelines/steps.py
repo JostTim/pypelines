@@ -9,7 +9,17 @@ from dataclasses import dataclass
 import textwrap
 
 from types import MethodType
-from typing import Callable, Type, Iterable, Protocol, List, TYPE_CHECKING, Any, Optional, cast
+from typing import (
+    Callable,
+    Type,
+    Iterable,
+    Protocol,
+    List,
+    TYPE_CHECKING,
+    Any,
+    Optional,
+    cast,
+)
 
 if TYPE_CHECKING:
     from .pipelines import Pipeline
@@ -18,7 +28,14 @@ if TYPE_CHECKING:
     from .tasks import BaseStepTaskManager
 
 
-def stepmethod(requires=None, version=None, do_dispatch=None, on_save_callbacks=None, disk_class=None, step_name=None):
+def stepmethod(
+    requires=None,
+    version=None,
+    do_dispatch=None,
+    on_save_callbacks=None,
+    disk_class=None,
+    step_name=None,
+):
     """Wrapper to attach some attributes to a method of a pipeline's pipe. These methods are necessary to trigger the
     pipeline creation mechanism on that step_method after the pipe has been fully defined.
 
@@ -74,7 +91,6 @@ def stepmethod(requires=None, version=None, do_dispatch=None, on_save_callbacks=
 
 
 class BaseStep:
-
     step_name: str
 
     requires: List["BaseStep"] | List[str] | str
@@ -89,7 +105,12 @@ class BaseStep:
     pipe: "BasePipe"
     pipeline: "Pipeline"
 
-    def __init__(self, pipeline: "Pipeline", pipe: "BasePipe", worker: Optional[MethodType] = None):
+    def __init__(
+        self,
+        pipeline: "Pipeline",
+        pipe: "BasePipe",
+        worker: Optional[MethodType] = None,
+    ):
         """Initialize a BaseStep object.
 
         Args:
@@ -126,9 +147,13 @@ class BaseStep:
         self.version = self.get_attribute_or_default("version", None)
 
         self.requires = self.get_attribute_or_default("requires", [])
-        self.requires = [self.requires] if not isinstance(self.requires, list) else self.requires
+        self.requires = (
+            [self.requires] if not isinstance(self.requires, list) else self.requires
+        )
 
-        self.disk_class = self.get_attribute_or_default("disk_class", getattr(self.pipe, "disk_class"))
+        self.disk_class = self.get_attribute_or_default(
+            "disk_class", getattr(self.pipe, "disk_class")
+        )
         if self.disk_class is None:
             raise AttributeError(
                 f"disk_class of step {self.step_name} should be : \n"
@@ -138,7 +163,9 @@ class BaseStep:
             )
 
         self.callbacks = self.get_attribute_or_default("callbacks", [])
-        self.callbacks = [self.callbacks] if not isinstance(self.callbacks, list) else self.callbacks
+        self.callbacks = (
+            [self.callbacks] if not isinstance(self.callbacks, list) else self.callbacks
+        )
 
         # self.make_wrapped_functions()
 
@@ -148,7 +175,9 @@ class BaseStep:
             self.task = self.pipeline.runner_backend.create_task_manager(self)
 
     def get_attribute_or_default(self, attribute_name: str, default: Any) -> Any:
-        return getattr(self, attribute_name, getattr(self.worker, attribute_name, default))
+        return getattr(
+            self, attribute_name, getattr(self.worker, attribute_name, default)
+        )
 
     def find_and_bind_worker(self, worker_object: Optional[MethodType]):
         if not hasattr(self, "worker"):
@@ -170,13 +199,21 @@ class BaseStep:
         if not hasattr(self, "worker"):
             if worker_object is None:
                 raise AttributeError(self.worker_unfindable_message)
-            step_name = getattr(self, "step_name", getattr(worker_object, "step_name", worker_object.__name__))
+            step_name = getattr(
+                self,
+                "step_name",
+                getattr(worker_object, "step_name", worker_object.__name__),
+            )
         else:
-            step_name = self.get_attribute_or_default("step_name", self.__class__.__name__)
+            step_name = self.get_attribute_or_default(
+                "step_name", self.__class__.__name__
+            )
         step_name = to_snake_case(step_name)
 
         if not step_name:
-            raise ValueError(f'Step name in {self.pipe.pipe_name} cannot be an empty string "" or None')
+            raise ValueError(
+                f'Step name in {self.pipe.pipe_name} cannot be an empty string "" or None'
+            )
 
         return step_name
 
@@ -333,20 +370,25 @@ class BaseStep:
         """
         if self.do_dispatch:
             return autoload_arguments(
-                self.pipe.dispatcher(loggedmethod(self.generation_mechanism), "generator"),
+                self.pipe.dispatcher(
+                    loggedmethod(self.generation_mechanism), "generator"
+                ),
                 self,
             )
         return autoload_arguments(loggedmethod(self.generation_mechanism), self)
 
     def get_run_callbacks(self):
         def wrapper(session, extra=None, show_plots=True):
-
             if extra is None:
                 extra = self.get_default_extra()
 
             logger = logging.getLogger("callback_runner")
             for callback_data in self.callbacks:
-                arguments = {"session": session, "extra": extra, "pipeline": self.pipeline}
+                arguments = {
+                    "session": session,
+                    "extra": extra,
+                    "pipeline": self.pipeline,
+                }
                 if isinstance(callback_data, tuple):
                     callback = callback_data[0]
                     overriding_arguments = callback_data[1]
@@ -356,7 +398,9 @@ class BaseStep:
                 arguments.update(overriding_arguments)
                 on_what = f"{session.alias}.{extra}" if extra else session.alias
                 try:
-                    logger.info(f"Running the callback {callback.__name__} on {on_what}")
+                    logger.info(
+                        f"Running the callback {callback.__name__} on {on_what}"
+                    )
                     callback(**arguments)
                 except Exception as e:
                     import traceback
@@ -536,14 +580,18 @@ class BaseStep:
                                 " and load implementation. Check the original error above."
                             ) from e
 
-                        logger.load(f"Loaded {self.relative_name}{'.' + extra if extra else ''} sucessfully.")
+                        logger.load(
+                            f"Loaded {self.relative_name}{'.' + extra if extra else ''} sucessfully."
+                        )
                         return result
                 else:
                     logger.load(
                         f"Could not find or load {self.relative_name}{'.' + extra if extra else ''} saved file."
                     )
             else:
-                logger.load("`refresh` was set to True, ignoring the state of disk files and running the function.")
+                logger.load(
+                    "`refresh` was set to True, ignoring the state of disk files and running the function."
+                )
 
             if check_requirements:
                 # if refresh_requirements:
@@ -552,7 +600,7 @@ class BaseStep:
                 logger.info("Checking the requirements")
 
                 # decide if we will refresh every required step, if refresh_requirements was set to True
-                if refresh_requirements == True:
+                if refresh_requirements is True:
                     always_refresh = True
                 else:
                     always_refresh = False
@@ -601,7 +649,9 @@ class BaseStep:
                 return None
 
             if in_requirement:
-                logger.header(f"Performing the requirement {self.relative_name}{'.' + extra if extra else ''}")
+                logger.header(
+                    f"Performing the requirement {self.relative_name}{'.' + extra if extra else ''}"
+                )
             else:
                 logger.header(
                     f"Performing the computation to generate {self.relative_name}{'.' + extra if extra else ''}"
@@ -612,7 +662,9 @@ class BaseStep:
             result = self.pipe.pre_run_wrapper(self.worker(session, *args, **kwargs))
 
             if save_output:
-                logger.save(f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output.")
+                logger.save(
+                    f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output."
+                )
                 disk_object.save(result)
                 self.run_callbacks(session, extra=extra, show_plots=False)
 
@@ -637,10 +689,18 @@ class BaseStep:
             "save_output": True,
         }.items():
             if original_signature.parameters.get(param) is None:
-                new_params.append(inspect.Parameter(param, inspect.Parameter.KEYWORD_ONLY, default=default_value))
+                new_params.append(
+                    inspect.Parameter(
+                        param, inspect.Parameter.KEYWORD_ONLY, default=default_value
+                    )
+                )
 
         # inserting the new params before the kwargs param if there is one.
-        original_params = original_params[:kwarg_position] + new_params + original_params[kwarg_position:]
+        original_params = (
+            original_params[:kwarg_position]
+            + new_params
+            + original_params[kwarg_position:]
+        )
 
         # Replace the wrapper function's signature with the new one
         wrapper.__signature__ = original_signature.replace(parameters=original_params)
@@ -706,7 +766,9 @@ class BaseStep:
                     Defaults to True.
         """
         for line_no, line in enumerate(lines):
-            if not inserted_chapter and ("Raises" in line or "Returns" in line or line_no >= lines_count - 1):
+            if not inserted_chapter and (
+                "Raises" in line or "Returns" in line or line_no >= lines_count - 1
+            ):
                 new_doc += new_chapter + "\n"
                 inserted_chapter = True
             new_doc += line + "\n"
@@ -717,7 +779,9 @@ class BaseStep:
         sig = inspect.signature(self.worker)
         param = sig.parameters.get("extra")
         if param is None:
-            raise ValueError(f"Parameter extra not found in function {self.relative_name}")
+            raise ValueError(
+                f"Parameter extra not found in function {self.relative_name}"
+            )
         if param.default is param.empty:
             raise ValueError("Parameter extra does not have a default value")
         return param.default
@@ -753,7 +817,9 @@ class BaseStep:
             return kwargs[pipe_name]
 
         try:
-            req_step = [step for step in self.requirement_stack() if step.pipe_name == pipe_name][-1]
+            req_step = [
+                step for step in self.requirement_stack() if step.pipe_name == pipe_name
+            ][-1]
         except IndexError as e:
             raise IndexError(
                 f"Could not find a required step with the pipe_name {pipe_name} for the step {self.relative_name}. "
