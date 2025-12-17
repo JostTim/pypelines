@@ -458,6 +458,7 @@ class BaseStep:
                 steps/pipes (default is False).
             check_requirements: If True, checks requirements with skip=True (default is False).
             save_output: If False, doesn't save the output to file after calculation (default is True).
+            run_callbacks (bool, optional) : If True, we run the attached callbacks, else, we skip them.
             **kwargs: Additional keyword arguments for the worker function.
 
         Returns:
@@ -474,6 +475,7 @@ class BaseStep:
             refresh_requirements=False,
             check_requirements=False,
             save_output=True,
+            run_callbacks=True,
             **kwargs,
         ):
             """
@@ -498,6 +500,7 @@ class BaseStep:
             save_output=True,
                 if False, we don't save the output to file after calculation. If there is not calculation
                 (file exists and refresh is False), this has no effect. If True, we save the file after calculation.
+            run_callbacks (bool, optional) : If True, we run the attached callbacks, else, we skip them.
             """
 
             if extra is None:
@@ -666,7 +669,8 @@ class BaseStep:
                     f"Saving the generated {self.relative_name}{'.' + extra if extra else ''} output."
                 )
                 disk_object.save(result)
-                self.run_callbacks(session, extra=extra, show_plots=False)
+                if run_callbacks:
+                    self.run_callbacks(session, extra=extra, show_plots=False)
 
             return result
 
@@ -687,6 +691,7 @@ class BaseStep:
             "refresh_requirements": False,
             "check_requirements": False,
             "save_output": True,
+            "run_callbacks": True,
         }.items():
             if original_signature.parameters.get(param) is None:
                 new_params.append(
@@ -764,6 +769,7 @@ class BaseStep:
                     if tested with real data, and results are already loadable but you don't want to erase it by setting
                     refresh = True.
                     Defaults to True.
+                run_callbacks (bool, optional) : If True, we run the attached callbacks, else, we skip them.
         """
         for line_no, line in enumerate(lines):
             if not inserted_chapter and (
