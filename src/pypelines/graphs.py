@@ -1,11 +1,15 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 if TYPE_CHECKING:
-    from networkx import DiGraph
-    from .steps import BaseStep
-    from .pipelines import Pipeline
     from matplotlib.axes import Axes
     from matplotlib.text import Text
+    from networkx import DiGraph
+
+    from .pipelines import Pipeline
+    from .steps import BaseStep
+
+    class _draw_network_callable(Protocol):
+        def __call__(self, *args, **kwargs) -> dict[str, Text]: ...
 
 
 class PipelineGraph:
@@ -21,15 +25,20 @@ class PipelineGraph:
         Returns:
             None
         """
-        from networkx import DiGraph, draw, spring_layout, draw_networkx_labels
+        from networkx import DiGraph, draw, draw_networkx_labels, spring_layout
 
         self.pipeline = pipeline
         self.pipeline.resolve()
 
         self.DiGraph = DiGraph
         self.nxdraw = draw
-        self.get_spring_layout = spring_layout
-        self.draw_networkx_labels = draw_networkx_labels
+        self.get_spring_layout = cast(
+            Callable[[DiGraph], dict[str, tuple[float, float]]], spring_layout
+        )
+        self.draw_networkx_labels = cast(
+            _draw_network_callable,
+            draw_networkx_labels,
+        )
 
         self.make_graphs()
 
@@ -94,7 +103,7 @@ class PipelineGraph:
         if layout == "aligned":
             pos = self.get_aligned_layout()
         elif layout == "spring":
-            pos = cast(dict[str, tuple[float, float]], self.get_spring_layout(self.name_graph))
+            pos = self.get_spring_layout(self.name_graph)
         else:
             raise ValueError("layout must be : aligned or tree")
 
@@ -102,15 +111,29 @@ class PipelineGraph:
         if remove_pipe:
             self.draw_columns_labels(pos, ax, font_size=font_size, rotation=rotation)
         pos = self.separate_crowded_levels(pos, max_spacing=max_spacing)
-        self.nxdraw(self.name_graph, pos, ax=ax, with_labels=False, node_color=node_color, **kwargs)
-        texts = cast("dict[str, Text]", self.draw_networkx_labels(self.name_graph, pos, labels, font_size=font_size))
+        self.nxdraw(
+            self.name_graph,
+            pos,
+            ax=ax,
+            with_labels=False,
+            node_color=node_color,
+            **kwargs,
+        )
+        texts = self.draw_networkx_labels(
+            self.name_graph, pos, labels, font_size=font_size
+        )
+
         for _, t in texts.items():
             t.set_rotation(rotation)
         ax.margins(0.20)
-        ax.set_title(f"Pipeline {self.pipeline.pipeline_name} requirement graph", y=0.05)
+        ax.set_title(
+            f"Pipeline {self.pipeline.pipeline_name} requirement graph", y=0.05
+        )
         return ax
 
-    def draw_columns_labels(self, pos: dict[str, tuple[float, float]], ax: "Axes", font_size=7, rotation=30):
+    def draw_columns_labels(
+        self, pos: dict[str, tuple[float, float]], ax: "Axes", font_size=7, rotation=30
+    ):
         """Draw column labels on the plot.
 
         Args:
@@ -131,7 +154,14 @@ class PipelineGraph:
 
         for column_name, (x, y) in unique_pos.items():
             ax.text(
-                x, y, column_name, ha="center", va="center", fontsize=font_size, rotation=rotation, fontweight="bold"
+                x,
+                y,
+                column_name,
+                ha="center",
+                va="center",
+                fontsize=font_size,
+                rotation=rotation,
+                fontweight="bold",
             )
             ax.axvline(x, ymin=0.1, ymax=0.85, zorder=-1, lw=0.5, color="gray")
 
@@ -162,7 +192,9 @@ class PipelineGraph:
         Returns:
             dict: A dictionary mapping node names to their (x, y) coordinates in the layout.
         """
-        pipe_x_indices = {pipe.pipe: index for index, pipe in enumerate(self.pipeline.pipes.values())}
+        pipe_x_indices = {
+            pipe.pipe: index for index, pipe in enumerate(self.pipeline.pipes.values())
+        }
         pos = {}
         for node in cast("list[BaseStep]", self.callable_graph.nodes):
             # if len([]) # TODO : add distinctions of fractions of y if multiple nodes of the same pipe have same level
@@ -193,7 +225,11 @@ class PipelineGraph:
             y_pos = value[1]
             if f"{pipe_name}_{y_pos}" in treated_pipes:
                 continue
-            multi_steps = {k: v for k, v in pos.items() if pipe_name == k.split(".")[0] and v[1] == y_pos}
+            multi_steps = {
+                k: v
+                for k, v in pos.items()
+                if pipe_name == k.split(".")[0] and v[1] == y_pos
+            }
             if len(multi_steps) == 1:
                 continue
             x_min, x_max = x_pos - max_spacing, x_pos + max_spacing

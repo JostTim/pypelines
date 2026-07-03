@@ -1,28 +1,29 @@
-from .tasks import BaseTaskBackend, BaseStepTaskManager
-from .pipelines import Pipeline
-from .loggs import FileFormatter
-from pathlib import Path
-from traceback import format_exc as format_traceback_exc
 import logging
-import coloredlogs
-from logging import getLogger
-from platform import node
-from pandas import Series
 import platform
+from logging import getLogger
+from pathlib import Path
+from platform import node
 from threading import Thread
-
+from traceback import format_exc as format_traceback_exc
 from typing import TYPE_CHECKING, List
+
+import coloredlogs
+from pandas import Series
+
+from ..loggs import FileFormatter
+from ..pipelines import Pipeline
+from ..tasks import BaseStepTaskManager, BaseTaskBackend
 
 if TYPE_CHECKING:
     from celery import Celery
-    from .steps import BaseStep
+
+    from ..steps import BaseStep
 
 
 APPLICATIONS_STORE = {}
 
 
 class CeleryAlyxTaskManager(BaseStepTaskManager):
-
     backend: "CeleryTaskBackend"
     step: "BaseStep"
 
@@ -55,12 +56,13 @@ class CeleryAlyxTaskManager(BaseStepTaskManager):
 
         if not self.backend:
             raise NotImplementedError(
-                "Cannot start a task on a celery cluster as this pipeline " "doesn't have a working celery backend"
+                "Cannot start a task on a celery cluster as this pipeline "
+                "doesn't have a working celery backend"
             )
 
         return CeleryTaskRecord.create(self, session, extra, **kwargs)
 
-    def get_runner(superself):  # type: ignore
+    def get_runner(superself):
         """Return a CeleryRunner task for executing a step in a pipeline.
 
         Args:
@@ -93,10 +95,17 @@ class CeleryAlyxTaskManager(BaseStepTaskManager):
 
                         try:
                             step: "BaseStep" = (
-                                application.pipelines[task.pipeline_name].pipes[task.pipe_name].steps[task.step_name]
+                                application.pipelines[task.pipeline_name]
+                                .pipes[task.pipe_name]
+                                .steps[task.step_name]
                             )
 
-                            step.generate(session, extra=extra, **task.arguments, **task.management_arguments)
+                            step.generate(
+                                session,
+                                extra=extra,
+                                **task.arguments,
+                                **task.management_arguments,
+                            )
                             task.status_from_logs(log_object)
                         except Exception as e:
                             traceback_msg = format_traceback_exc()
@@ -289,7 +298,10 @@ class CeleryTaskRecord(dict):
         Returns:
             dict: A dictionary containing the object's id and data with certain keys removed.
         """
-        return {"id": self["id"], "data": {k: v for k, v in self.items() if k not in ["id", "session_path"]}}
+        return {
+            "id": self["id"],
+            "data": {k: v for k, v in self.items() if k not in ["id", "session_path"]},
+        }
 
     @staticmethod
     def create(task_manager: CeleryAlyxTaskManager, session, extra=None, **kwargs):
@@ -322,11 +334,16 @@ class CeleryTaskRecord(dict):
         response_handle = worker.delay(task_dict["id"], extra=extra)
 
         return CeleryTaskRecord(
-            task_dict["id"], task_infos_dict=task_dict, response_handle=response_handle, session=session
+            task_dict["id"],
+            task_infos_dict=task_dict,
+            response_handle=response_handle,
+            session=session,
         )
 
     @staticmethod
-    def create_from_task_name(app: "Celery", task_name: str, pipeline_name: str, session, extra=None, **kwargs):
+    def create_from_task_name(
+        app: "Celery", task_name: str, pipeline_name: str, session, extra=None, **kwargs
+    ):
         """Create a new task from the given task name and pipeline name.
 
         Args:
@@ -354,15 +371,26 @@ class CeleryTaskRecord(dict):
 
         task_dict = connector.alyx.rest("tasks", "create", data=data)
 
-        response_handle = app.send_task(name=task_name, kwargs={"task_id": task_dict["id"], "extra": extra})
+        response_handle = app.send_task(
+            name=task_name, kwargs={"task_id": task_dict["id"], "extra": extra}
+        )
 
         return CeleryTaskRecord(
-            task_dict["id"], task_infos_dict=task_dict, response_handle=response_handle, session=session
+            task_dict["id"],
+            task_infos_dict=task_dict,
+            response_handle=response_handle,
+            session=session,
         )
 
     @staticmethod
     def create_from_model(
-        app: "Celery", task_model: type, task_name: str, pipeline_name: str, session: object, extra=None, **kwargs
+        app: "Celery",
+        task_model: type,
+        task_name: str,
+        pipeline_name: str,
+        session: object,
+        extra=None,
+        **kwargs,
     ):
         """Create a new task from a given task model and send it to a Celery app.
 
@@ -380,16 +408,27 @@ class CeleryTaskRecord(dict):
                 response handle, and session.
         """
 
-        new_task = task_model(name=task_name, session=session, arguments=kwargs, status=25, executable=pipeline_name)
+        new_task = task_model(
+            name=task_name,
+            session=session,
+            arguments=kwargs,
+            status=25,
+            executable=pipeline_name,
+        )
         new_task.save()
 
         task_dict = new_task.__dict__.copy()
         task_dict.pop("_state", None)
 
-        response_handle = app.send_task(name=task_name, kwargs={"task_id": task_dict["id"], "extra": extra})
+        response_handle = app.send_task(
+            name=task_name, kwargs={"task_id": task_dict["id"], "extra": extra}
+        )
 
         return CeleryTaskRecord(
-            task_dict["id"], task_infos_dict=task_dict, response_handle=response_handle, session=session
+            task_dict["id"],
+            task_infos_dict=task_dict,
+            response_handle=response_handle,
+            session=session,
         )
 
 
@@ -452,7 +491,9 @@ class LogTask:
             level (str, optional): The logging level for the task. Defaults to "LOAD".
         """
         self.path = Path(task_record.session_path) / "logs"
-        self.username = username if username is not None else (node() if node() else "unknown")
+        self.username = (
+            username if username is not None else (node() if node() else "unknown")
+        )
         self.worker_pk = task_record.task_id
         self.task_name = task_record["name"]
         self.level = getattr(logging, level.upper())
@@ -542,7 +583,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     logger = getLogger("pypelines.create_celery_app")
 
     if app_name in APPLICATIONS_STORE.keys():
-        logger.warning(f"Tried to create a celery app named {app_name}, but it already exists. Returning it instead.")
+        logger.warning(
+            f"Tried to create a celery app named {app_name}, but it already exists. Returning it instead."
+        )
         return APPLICATIONS_STORE[app_name]
 
     try:
@@ -582,7 +625,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             str: The function signature as a string without the 'session' parameter.
         """
         params = [
-            param_value for param_name, param_value in signature.parameters.items() if param_name not in ["session"]
+            param_value
+            for param_name, param_value in signature.parameters.items()
+            if param_name not in ["session"]
         ]
         return str(signature.replace(parameters=params))[1:-1].replace(" *,", "")
 
@@ -596,15 +641,17 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             str: The name of the type hint.
         """
         from inspect import Parameter
-        from typing import get_args, get_origin
         from types import UnionType
+        from typing import get_args, get_origin
 
         if isinstance(annotation, str):
             annotation = string_to_typehint(annotation, globals(), locals())
 
         if isinstance(annotation, UnionType):
             typ = get_args(annotation)[0]
-        elif hasattr(annotation, "__origin__"):  # For types from 'typing' like List, Dict, etc.
+        elif hasattr(
+            annotation, "__origin__"
+        ):  # For types from 'typing' like List, Dict, etc.
             typ = get_origin(annotation)
         else:
             typ = annotation
@@ -653,10 +700,11 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         parameters = signature.parameters
         parsed_args = {}
         for name, param in parameters.items():
-
             parsed_args[name] = {
                 "typehint": get_type_name(param.annotation),
-                "default_value": param.default if param.default is not Parameter.empty else "__empty__",
+                "default_value": param.default
+                if param.default is not Parameter.empty
+                else "__empty__",
                 "kind": param.kind.name,
             }
 
@@ -695,8 +743,12 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                 for pipe in pipeline.pipes.values():
                     for step in pipe.steps.values():
                         if step.complete_name in app.tasks.keys():
-                            str_sig = get_signature_as_string(step.generate.__signature__)
-                            dict_sig = get_signature_as_dict(step.generate.__signature__)
+                            str_sig = get_signature_as_string(
+                                step.generate.__signature__
+                            )
+                            dict_sig = get_signature_as_dict(
+                                step.generate.__signature__
+                            )
                             doc = step.generate.__doc__
                             task_data = {
                                 "signature": str_sig,
@@ -705,7 +757,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                                 "step_name": step.step_name,
                                 "pipe_name": step.pipe_name,
                                 "pipeline_name": step.pipeline_name,
-                                "requires": [item.complete_name for item in step.requires],
+                                "requires": [
+                                    item.complete_name for item in step.requires
+                                ],
                                 "step_level_in_pipe": step.get_level(selfish=selfish),
                             }
                             tasks_dynamic_data[step.complete_name] = task_data
@@ -732,7 +786,12 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
         return {"workers": workers, "task_names": task_names}
 
     def get_celery_app_tasks(
-        self, refresh=False, auto_refresh=3600 * 24, failed_refresh=60 * 5, initial_timeout=10, refresh_timeout=2
+        self,
+        refresh=False,
+        auto_refresh=3600 * 24,
+        failed_refresh=60 * 5,
+        initial_timeout=10,
+        refresh_timeout=2,
     ):
         """Get the celery app tasks data with optional refresh mechanism.
 
@@ -750,19 +809,32 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
         from datetime import datetime, timedelta
 
-        auto_refresh_time = timedelta(0, seconds=auto_refresh)  # a full day (24 hours of 3600 seconds)
-        failed_refresh_retry_time = timedelta(0, failed_refresh)  # try to refresh after 5 minutes
+        auto_refresh_time = timedelta(
+            0, seconds=auto_refresh
+        )  # a full day (24 hours of 3600 seconds)
+        failed_refresh_retry_time = timedelta(
+            0, failed_refresh
+        )  # try to refresh after 5 minutes
 
         app_task_data = getattr(self, "task_data", None)
 
         if app_task_data is None:
             try:
-                task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=initial_timeout)
+                task_data = (
+                    self.tasks[f"{app_name}.tasks_infos"]
+                    .delay(app_name)
+                    .get(timeout=initial_timeout)
+                )
                 # we set timeout to 10 sec if the task data doesn't exist.
                 # It's long to wait for a webpage to load, but sometimes the workers take time to come out of sleep
-                app_task_data = {"task_data": task_data, "refresh_time": datetime.now() + auto_refresh_time}
+                app_task_data = {
+                    "task_data": task_data,
+                    "refresh_time": datetime.now() + auto_refresh_time,
+                }
                 setattr(self, "task_data", app_task_data)
-                logger.warning("Got tasks data for the first time since django server relaunched")
+                logger.warning(
+                    "Got tasks data for the first time since django server relaunched"
+                )
             except Exception as e:
                 logger.warning(f"Could not get tasks from app. {e}")
                 # logger.warning(f"Remote tasks are : {self.get_remote_tasks()}")
@@ -770,7 +842,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
         else:
             now = datetime.now()
-            if now > app_task_data["refresh_time"]:  # we refresh if refresh time is elapsed
+            if (
+                now > app_task_data["refresh_time"]
+            ):  # we refresh if refresh time is elapsed
                 logger.warning(
                     "Time has come to auto refresh app_task_data. "
                     f"refresh_time was {app_task_data['refresh_time']} and now is {now}"
@@ -779,9 +853,16 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
 
             if refresh:
                 try:
-                    task_data = self.tasks[f"{app_name}.tasks_infos"].delay(app_name).get(timeout=refresh_timeout)
+                    task_data = (
+                        self.tasks[f"{app_name}.tasks_infos"]
+                        .delay(app_name)
+                        .get(timeout=refresh_timeout)
+                    )
                     # if the data needs to be refreshed, we don't wait for as long as for a first get of infos.
-                    app_task_data = {"task_data": task_data, "refresh_time": now + auto_refresh_time}
+                    app_task_data = {
+                        "task_data": task_data,
+                        "refresh_time": now + auto_refresh_time,
+                    }
                     logger.warning("Refreshed celery tasks data sucessfully")
                 except Exception as e:
                     logger.warning(
@@ -792,10 +873,14 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
                 setattr(self, "task_data", app_task_data)
             else:
                 delta = (app_task_data["refresh_time"] - now).total_seconds()
-                logger.warning(f"Returned cached task_data. Next refresh will happen in at least {delta} seconds")
+                logger.warning(
+                    f"Returned cached task_data. Next refresh will happen in at least {delta} seconds"
+                )
         return app_task_data["task_data"] if app_task_data is not None else None
 
-    def launch_named_task_remotely(self, session_id, task_name, task_model=None, extra=None, kwargs={}):
+    def launch_named_task_remotely(
+        self, session_id, task_name, task_model=None, extra=None, kwargs={}
+    ):
         """Launches a named task remotely.
 
         Args:
@@ -847,7 +932,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     try:
         from dynaconf import Dynaconf
     except ImportError:
-        logger.warning(f"{failure_message} Could not import dynaconf. Maybe it is not istalled ?")
+        logger.warning(
+            f"{failure_message} Could not import dynaconf. Maybe it is not istalled ?"
+        )
         return None
 
     try:
@@ -872,7 +959,9 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
     try:
         from celery import Celery
     except ImportError:
-        logger.warning(f"{failure_message} Could not import celery. Maybe is is not installed ?")
+        logger.warning(
+            f"{failure_message} Could not import celery. Maybe is is not installed ?"
+        )
         return None
 
     try:
@@ -882,23 +971,27 @@ def create_celery_app(conf_path, app_name="pypelines", v_host=None) -> "Celery |
             backend=f"{backend}://",
         )
     except Exception as e:
-        logger.warning(f"{failure_message} Could not create app. Maybe rabbitmq server @{address} is not running ? {e}")
+        logger.warning(
+            f"{failure_message} Could not create app. Maybe rabbitmq server @{address} is not running ? {e}"
+        )
         return None
 
     for key, value in conf_data.items():
         try:
             setattr(app.conf, key, value)
         except Exception as e:
-            logger.warning(f"{failure_message} Could assign extra attribute {key} to celery app. {e}")
+            logger.warning(
+                f"{failure_message} Could assign extra attribute {key} to celery app. {e}"
+            )
             return None
 
     app.register_task(Handshake)
     app.register_task(TasksInfos)
 
-    app.get_remote_tasks = MethodType(get_remote_tasks, app)  # type: ignore
-    app.get_celery_app_tasks = MethodType(get_celery_app_tasks, app)  # type: ignore
-    app.launch_named_task_remotely = MethodType(launch_named_task_remotely, app)  # type: ignore
-    app.is_hand_shaken = MethodType(is_hand_shaken, app)  # type: ignore
+    app.get_remote_tasks = MethodType(get_remote_tasks, app)
+    app.get_celery_app_tasks = MethodType(get_celery_app_tasks, app)
+    app.launch_named_task_remotely = MethodType(launch_named_task_remotely, app)
+    app.is_hand_shaken = MethodType(is_hand_shaken, app)
     app.single_worker_start = MethodType(single_worker_start, app)
 
     logger.info(f"The celery app {app_name} was created successfully.")
@@ -914,7 +1007,9 @@ class CeleryWorkerThread(Thread):
         self.app = app
 
     def run(self):
-        self.app.worker_main(argv=["worker", "--loglevel=INFO", "--concurrency=1", "--pool=solo"])
+        self.app.worker_main(
+            argv=["worker", "--loglevel=INFO", "--concurrency=1", "--pool=solo"]
+        )
         # self.app.start()
 
     def stop(self):
